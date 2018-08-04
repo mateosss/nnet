@@ -1,0 +1,36 @@
+class Neuron(Object):
+  value = 0
+
+Connection with neuron input to one neuron:
+
+lets say i have one neuron in the second layer trying to recognize a segment in a piece of the image, then i assign the input of the 784 pixels, a "weight" (between -1 and 1) corresponding to this one neuron, in which the neurons related to the pixels in the area that should be white, have a high weight, and for example the borders i put a negative weight to make them be black, so when i activate my positive weighted pixels, and i dont activate my negative weighted pixels, i get the best possible value of the total sum of the neurons, so if that's the case then there is very probable that that this neuron is kindoff true, aka, there is a segmente there, but if it is a low amount, then, probably there isnt a segment in the image.
+
+the total sum of the weights*neurons w1*pixelValue1+...+wn*pixelValuen is reduced between 0 and 1 with the "squisification" function sigmoid(x)=1/(1+e**-x), so now 0 is the minimum (like a false), and 1 the maximum (like a true)
+
+sometimes you would want to not reach true until some "bias" value, so you add the bias to the sum, so: sigmoid(w1*p1+...+wn*pn - bias), so it wont reach 1 if the sum doesn't pass 10
+
+so... each connection has a weight associated with it, and each next neuron has a bias.
+
+in a 784->16->16->10 network, it has 784*16 + 16*16 + 16*10 + 16 + 16 + 10 = 13002 values to tweak, that tweaking is called "learning"
+
+_A0___A1____An_
+a00 | a01 | a0n
+a10 | a11 | a1n
+.   | .   | .
+.   | .   | .
+.   | .   | .
+an0 | an1 | ann
+
+and A1 = W*A0+B1 with W the matrix with <amount of neurons in column 1> rows and <amount of neurons in column 0> columns, which saves the weights of each conection, and B1, the biases of each column 1 neuron.
+
+so... new neuron is a10 = sigmoid(W*A0 + B)
+
+also it seems to be more common to use the ReLU)(x)=max(0,x) function instead of sigmoids
+
+Things to do after this video:
+
+- make neurons
+- make connections
+- make layers
+- set random weights and biases
+- read training data
