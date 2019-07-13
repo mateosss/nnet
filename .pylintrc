@@ -1,0 +1,3 @@
+[MASTER]
+# TODO: Progressively remove all disabled warnings
+disable=C0111, W0622, C0103
