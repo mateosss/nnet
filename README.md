@@ -64,3 +64,9 @@ And finally, the core of the project. Once the genetic algorithm version is
 done, we will finally try to implement proper backpropagation, dumping out the
 genetic algorithms and understanding the equations, solving the necessary ones,
 and finally implementing them.
+
+# Nice Extras
+
+- [ ] MyPy
+- [ ] Perfect pylint score
+- [ ] Good testing support

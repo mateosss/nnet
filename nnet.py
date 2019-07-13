@@ -1,10 +1,7 @@
 from typing import List
-import numpy as np
 import itertools as it
-from numpy import prod
+import numpy as np
 from numpy.random import rand
-
-nnet = NeuralNetwork()
 
 class NeuralNetwork:
     """
@@ -28,7 +25,7 @@ class NeuralNetwork:
             (i for n in self.dlayers[1:] for i in rand(n)), # Biases
         )
 
-    def create_layers(self, params): # TODO
+    def create_layers(self, params):
         """
         Maps the flat params iterator to proper weights and biases matrices
 
@@ -36,6 +33,10 @@ class NeuralNetwork:
             [w[li][mj][nk] for i layers in j neurons in k connections] ++
             [b[li][mj] for i layers in j neurons]
         """
+        # TODO: never make this conversion explicit
+        # use the params generator directly for performance
+        params = list(params)
+
         wsizes = [n * m for n, m in zip(self.dlayers, self.dlayers[1:])]
         bsizes = self.dlayers.copy()[1:]
         assert len(params) == sum(wsizes) + sum(bsizes), (
@@ -57,8 +58,10 @@ class NeuralNetwork:
         """
 
         # Offset of layer based on previous layer weights matrix size
-        offset_layer = [0] + it.accumulate(wsizes[:-1])
+        # First two layers start at 0 (input layer, and first layer)
+        offset_layer = np.concatenate(([0, 0], np.cumsum(wsizes[:-1])))
         l = len(self.dlayers)
+        self.weight = [np.empty(0) for i in range(l)]
         for i in range(1, l): # Weights Matrix
             n = self.dlayers[i - 1]
             m = self.dlayers[i]
@@ -66,6 +69,19 @@ class NeuralNetwork:
             for j in range(m): # Column
                 for k in range(n): # Row
                     # TODO: Use direct copy of range 0..n instead of for k if this works
+                    # print(f"""
+                    #     wsizes={wsizes},
+                    #     offset_layer={offset_layer},
+                    #     len(self.weight)={len(self.weight)},
+                    #     len(self.weight[i])={len(self.weight[i])},
+                    #     len(self.weight[i][k])={len(self.weight[i][k])},
+                    #     len(params)={len(params)},
+                    #     len(offset_layer)={len(offset_layer)},
+                    #     i={i},
+                    #     k={k},
+                    #     j={j},
+                    #     offset_layer[i] + n * j + k={offset_layer[i] + n * j + k},
+                    # """)
                     self.weight[i][k][j] = params[offset_layer[i] + n * j + k]
 
         # Fill biases
@@ -73,8 +89,9 @@ class NeuralNetwork:
         # First index that is not a weight
         bias_start = offset_layer[-1] + self.weight[-1].size
         # Same idea as offset_layer but for biases
-        offset_bias = [0] + it.accumulate(bsizes[:-1])
-        for i, n in enumerate(self.dlayers[1:]):
+        offset_bias = np.concatenate(([0, 0], np.cumsum(bsizes[:-1])))
+        self.bias = [np.empty(0) for i in range(l)]
+        for i, n in enumerate(self.dlayers[1:], 1):
             self.bias[i] = np.empty(n)
             start = bias_start + offset_bias[i]
             self.bias[i][0:n] = params[start:start + n]
@@ -84,7 +101,10 @@ class NeuralNetwork:
         params: List of
         """
         self.create_layers(params)
-        values = np.array(values)
-        for layer in len(layers):
-            values = values @ weight[layer] + bias[layer]
-        return values
+        # values = np.array(values)
+        # for layer in len(layers):
+        #     values = values @ weight[layer] + bias[layer]
+        # return values
+
+
+nnet = NeuralNetwork()
