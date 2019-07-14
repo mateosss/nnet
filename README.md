@@ -17,7 +17,7 @@ possible):
 The roadmap of this project is as follows:
 
 1. [x] Implement forward propagation
-2. [ ] Implement batch or similar way of measuring the cost of the network
+2. [x] Implement batch or similar way of measuring the cost of the network
 3. [ ] Improve the network with a genetic algorithm
 4. [ ] Improve the network with proper backpropagation
 
