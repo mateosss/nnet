@@ -35,7 +35,7 @@ class NeuralNetwork:
             [w[li][mj][nk] for i layers in j neurons in k connections] ++
             [b[li][mj] for i layers in j neurons]
         """
-        # TODO: never make this conversion explicit
+        # TODO: don't make this kind of conversions explicitly
         # use the params generator directly for performance
         params = list(params)
 
@@ -69,22 +69,8 @@ class NeuralNetwork:
             m = self.dlayers[i]
             self.weight[i] = np.empty((n, m))
             for j in range(m): # Column
-                for k in range(n): # Row
-                    # TODO: Use direct copy of range 0..n instead of for k if this works
-                    # print(f"""
-                    #     wsizes={wsizes},
-                    #     offset_layer={offset_layer},
-                    #     len(self.weight)={len(self.weight)},
-                    #     len(self.weight[i])={len(self.weight[i])},
-                    #     len(self.weight[i][k])={len(self.weight[i][k])},
-                    #     len(params)={len(params)},
-                    #     len(offset_layer)={len(offset_layer)},
-                    #     i={i},
-                    #     k={k},
-                    #     j={j},
-                    #     offset_layer[i] + n * j + k={offset_layer[i] + n * j + k},
-                    # """)
-                    self.weight[i][k][j] = params[offset_layer[i] + n * j + k]
+                row_start = offset_layer[i] + n * j
+                self.weight[i][0:n, j] = params[row_start:row_start + n]
 
         # Fill biases
 
@@ -106,11 +92,11 @@ class NeuralNetwork:
         self.create_layers(params)
         inout = ilayer
         for layer in range(1, len(self.dlayers)):
-            print(f"""
-            inout={inout},
-            self.weight[layer]={self.weight[layer]},
-            self.bias[layer]={self.bias[layer]},
-            """)
+            # print(f"""
+            #     inout={inout},
+            #     self.weight[layer]={self.weight[layer]},
+            #     self.bias[layer]={self.bias[layer]},
+            # """)
             inout = sigmoid(inout @ self.weight[layer] + self.bias[layer])
         return inout
 
