@@ -3,6 +3,8 @@ import itertools as it
 import numpy as np
 from numpy.random import rand
 
+sigmoid = lambda x: 1 / (1 + np.exp(-x))
+
 class NeuralNetwork:
     """
     Let n be "amount of neurons in current layer"
@@ -109,7 +111,7 @@ class NeuralNetwork:
             self.weight[layer]={self.weight[layer]},
             self.bias[layer]={self.bias[layer]},
             """)
-            inout = inout @ self.weight[layer] + self.bias[layer]
+            inout = sigmoid(inout @ self.weight[layer] + self.bias[layer])
         return inout
 
 
