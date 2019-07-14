@@ -96,15 +96,21 @@ class NeuralNetwork:
             start = bias_start + offset_bias[i]
             self.bias[i][0:n] = params[start:start + n]
 
-    def __call__(self, params, values): # TODO
+    def __call__(self, params, ilayer):
         """
-        params: List of
+        params: List of params, same format as in get_random_params
+        ilayer: Input layer
         """
         self.create_layers(params)
-        # values = np.array(values)
-        # for layer in len(layers):
-        #     values = values @ weight[layer] + bias[layer]
-        # return values
+        inout = ilayer
+        for layer in range(1, len(self.dlayers)):
+            print(f"""
+            inout={inout},
+            self.weight[layer]={self.weight[layer]},
+            self.bias[layer]={self.bias[layer]},
+            """)
+            inout = inout @ self.weight[layer] + self.bias[layer]
+        return inout
 
 
 nnet = NeuralNetwork()

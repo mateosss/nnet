@@ -2,8 +2,6 @@
 
 from typing import List
 import mnist
-from numpy.random import rand
-import itertools as it
 from nnet import nnet
 
 def main():
@@ -15,3 +13,7 @@ def main():
     ninput = [pixel for row in image for pixel in row]
     params = nnet.get_random_params()
     guess: List[int] = nnet(params, ninput)
+    print(guess)
+
+if __name__ == '__main__':
+    main()
