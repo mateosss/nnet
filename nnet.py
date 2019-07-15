@@ -1,8 +1,9 @@
 from typing import List
 import itertools as it
 import numpy as np
-from numpy.random import rand
+from numpy.random import rand, randn
 
+# TODO: Try more activation functions as ReLU and others
 sigmoid = lambda x: 1 / (1 + np.exp(-x))
 
 class NeuralNetwork:
@@ -18,13 +19,18 @@ class NeuralNetwork:
     def set_layers_description(self, dlayers):
         self.dlayers = dlayers
 
+    # TODO: Understand and try other initializations as xavier and kaiming
+    # see https://towardsdatascience.com/weight-initialization-in-neural-networks-a-journey-from-the-basics-to-kaiming-954fb9b47c79
     def get_random_params(self):
         return it.chain(
+            # CUSTOM initialization heuristic
+            # i / n to scale the sum result based on number of input weights
+            # seems to work decently
             (
-                i for n, m in zip(self.dlayers, self.dlayers[1:])
-                for i in rand(n * m)
+                i / (n + 1) for n, m in zip(self.dlayers, self.dlayers[1:])
+                for i in randn(n * m)
             ), # Weights
-            (i for n in self.dlayers[1:] for i in rand(n)), # Biases
+            (i for n in self.dlayers[1:] for i in randn(n)), # Biases
         )
 
     def create_layers(self, params):
@@ -87,17 +93,13 @@ class NeuralNetwork:
     def __call__(self, params, ilayer):
         """
         params: List of params, same format as in get_random_params
-        ilayer: Input layer
+        ilayer: Normalized input layer scaled in range [0, 1]
         """
         self.create_layers(params)
         inout = ilayer
         for layer in range(1, len(self.dlayers)):
-            # print(f"""
-            #     inout={inout},
-            #     self.weight[layer]={self.weight[layer]},
-            #     self.bias[layer]={self.bias[layer]},
-            # """)
-            inout = sigmoid(inout @ self.weight[layer] + self.bias[layer])
+            inout = sigmoid(inout @ self.weight[layer] - self.bias[layer])
+            print(f"inout={inout}")
         return inout
 
 

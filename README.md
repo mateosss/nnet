@@ -67,6 +67,8 @@ and finally implementing them.
 
 # Nice Extras
 
-- [ ] MyPy
 - [ ] Perfect pylint score
+- [ ] MyPy linting
 - [ ] Good testing support
+- [ ] Migrate performance critical parts to c++
+- [ ] Cython?
