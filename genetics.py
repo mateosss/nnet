@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Type
 from numpy.random import rand
 import numpy as np
 
@@ -8,7 +8,7 @@ class Subject:
         raise NotImplementedError
 
     @staticmethod
-    def create_random() -> Subject:
+    def create_random():
         raise NotImplementedError
 
     # TODO: Memoize genome
@@ -29,16 +29,19 @@ class Subject:
 
 
 class GeneticAlgorithm:
-    # TODO: Paralelize
+    # TODO: Parallelize
 
     population: List[Subject]
     mutation_rate: float
     crossover_rate: float
+    SubjectClass: Type[Subject]
 
     def __init__(
-        self, iterations, size=8, mutation_rate=(1 / 1000), crossover_rate=0.7
+        self, SubjectClass, iterations,
+        size=8, mutation_rate=(1 / 1000), crossover_rate=0.7
     ):
         assert size % 2 == 0
+        self.SubjectClass = SubjectClass
         self.mutation_rate = mutation_rate
         self.crossover_rate = crossover_rate
         self.initialize_population(size)
@@ -54,7 +57,8 @@ class GeneticAlgorithm:
             self.population[popsize:] = [] # Keep only the fitest
 
     def initialize_population(self, size) -> None:
-        self.population = [Subject.create_random() for _ in range(size)]
+        S = self.SubjectClass
+        self.population = [S.create_random() for _ in range(size)]
 
     def roulette_sort(self) -> None:
         "Reorders population list based on fitness and luck"
@@ -66,7 +70,7 @@ class GeneticAlgorithm:
         Returns offspring of length (len(p) / 4) of the best p=population half
         """
         p = self.population # alias
-        return [self.crossover(p[i], p[i + 1]) for i in p[0:(len(p) / 2):2]]
+        return [self.crossover(p[i], p[i + 1]) for i in range(0, len(p) // 2, 2)]
 
     def fitness_sort(self) -> None:
         "Reorders population list based on fitness"
@@ -74,9 +78,10 @@ class GeneticAlgorithm:
 
     def crossover(self, p, q) -> Subject:
         "Makes a new subject out of p and q, with p being the fitest parent"
+        S = self.SubjectClass
         genome_length = len(p.genome)
         gen_choice = rand(genome_length) < self.crossover_rate
         will_mutate = rand(genome_length) < self.mutation_rate
         child_genome = np.where(gen_choice, p.genome, q.genome)
-        child_genome[will_mutate] = Subject.mutate(child_genome[will_mutate])
-        return Subject(child_genome)
+        child_genome[will_mutate] = S.mutate(child_genome[will_mutate])
+        return S(child_genome)
