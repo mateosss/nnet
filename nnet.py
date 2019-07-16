@@ -99,7 +99,7 @@ class NeuralNetwork:
         inout = ilayer
         for layer in range(1, len(self.dlayers)):
             inout = sigmoid(inout @ self.weight[layer] - self.bias[layer])
-            print(f"inout={inout}")
+            # print(f"inout={inout}")
         return inout
 
 

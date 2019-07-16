@@ -4,25 +4,18 @@ import numpy as np
 
 class Subject:
 
-    def __init__(self, genome, *args, **kwargs):
+    @classmethod
+    def create_random(cls):
         raise NotImplementedError
 
-    @staticmethod
-    def create_random():
-        raise NotImplementedError
-
-    # TODO: Memoize genome
     @property
     def genome(self) -> List:
         raise NotImplementedError
 
-    # TODO: Memoize fitness result, it should never change
     @property
     def fitness(self) -> float:
         raise NotImplementedError
 
-    # TODO: Think more about this
-    # Maybe a urand in [c +- d] range with c = (min + max) / 2, d = max - min
     @staticmethod
     def mutate(gen):
         raise NotImplementedError
@@ -49,12 +42,26 @@ class GeneticAlgorithm:
 
     def run(self, iterations):
         popsize = len(self.population)
-        for _ in range(iterations):
+        for i in range(iterations):
+            self.dump_round_stats(i, iterations)
             self.roulette_sort()
             self.population += self.best_half_offspring()
             self.population += self.best_half_offspring()
             self.fitness_sort()
             self.population[popsize:] = [] # Keep only the fitest
+
+    def dump_round_stats(self, round, max):
+        "Prints a round summary"
+        print(f"Round {round + 1}/{max} - Average: {self.get_average_costs()}")
+        for i, s in enumerate(self.population):
+            print(f" | [{i + 1}] - {s.fitness}")
+
+    def get_average_costs(self):
+        return np.mean([s.fitness for s in self.population])
+
+    @property
+    def best(self):
+        return self.population[0].genome
 
     def initialize_population(self, size) -> None:
         S = self.SubjectClass
@@ -62,7 +69,7 @@ class GeneticAlgorithm:
 
     def roulette_sort(self) -> None:
         "Reorders population list based on fitness and luck"
-        self.population.sort(key=lambda s: s.fitness * rand())
+        self.population.sort(key=lambda s: s.fitness * rand(), reverse=True)
 
     def best_half_offspring(self) -> List[Subject]:
         """
@@ -74,9 +81,9 @@ class GeneticAlgorithm:
 
     def fitness_sort(self) -> None:
         "Reorders population list based on fitness"
-        self.population.sort(key=lambda s: s.fitness)
+        self.population.sort(key=lambda s: s.fitness, reverse=True)
 
-    def crossover(self, p, q) -> Subject:
+    def crossover(self, p, q): # -> Subject
         "Makes a new subject out of p and q, with p being the fitest parent"
         S = self.SubjectClass
         genome_length = len(p.genome)

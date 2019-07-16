@@ -4,6 +4,7 @@ from typing import List
 from numpy import mean
 import mnist
 from nnet import nnet
+from genetic_nnet import GANeuralNetwork, NeuralGA
 
 def main():
     "Forward propagation specification"
@@ -27,5 +28,12 @@ def main():
     cost = mean(costs)
     print(f"Average cost of {cost} after {BATCH_SIZE} runs")
 
+def genetic_main():
+    ga = NeuralGA([784, 16, 16, 10], 1000)
+    with open("best.nn", "w") as f:
+        # print(str(ga.best))
+        f.write(str(ga.best))
+
+
 if __name__ == '__main__':
-    main()
+    genetic_main()
