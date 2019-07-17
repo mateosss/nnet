@@ -29,7 +29,7 @@ class GANeuralNetwork(Subject, NeuralNetwork):
     def fitness(self) -> float:
         return self.batch_cost() if not self._fitness else self._fitness
 
-    def batch_cost(self, batch_size=1):
+    def batch_cost(self, batch_size=50):
         "Runs a random minibatch and returns average network cost"
         costs = [None] * batch_size
         # db = sample(GANeuralNetwork.__mnist_db, batch_size) # Random samples
@@ -68,4 +68,4 @@ class GANeuralNetwork(Subject, NeuralNetwork):
 class NeuralGA(GeneticAlgorithm):
     def __init__(self, dlayers, iterations, **kwargs):
         GANeuralNetwork.set_layers_description(dlayers)
-        return super().__init__(GANeuralNetwork, iterations, **kwargs)
+        super().__init__(GANeuralNetwork, iterations, **kwargs)
