@@ -29,7 +29,7 @@ class GANeuralNetwork(Subject, NeuralNetwork):
     def fitness(self) -> float:
         return self.batch_cost() if not self._fitness else self._fitness
 
-    def batch_cost(self, batch_size=50):
+    def batch_cost(self, batch_size=10):
         "Runs a random minibatch and returns average network cost"
         costs = [None] * batch_size
         # db = sample(GANeuralNetwork.__mnist_db, batch_size) # Random samples

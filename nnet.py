@@ -3,9 +3,6 @@ import itertools as it
 import numpy as np
 from numpy.random import rand, randn
 
-# TODO: Try more activation functions as ReLU and others
-sigmoid = lambda x: 1 / (1 + np.exp(-x))
-
 class NeuralNetwork:
     """
     Let n be "amount of neurons in current layer"
@@ -90,17 +87,23 @@ class NeuralNetwork:
             start = bias_start + offset_bias[i]
             self.bias[i][0:n] = params[start:start + n]
 
+    def feedforward(self, ilayer):
+        "Forward propagation of the network, returns last layer activations"
+        # TODO: Try more activation functions as ReLU and others
+        sigmoid = lambda x: 1 / (1 + np.exp(-x))
+        inout = ilayer
+        for layer in range(1, len(self.dlayers)):
+            inout = sigmoid(inout @ self.weight[layer] - self.bias[layer])
+        return inout
+
     def __call__(self, params, ilayer):
         """
         params: List of params, same format as in get_random_params
         ilayer: Normalized input layer scaled in range [0, 1]
+        returns: last layer activations (the guess)
         """
         self.create_layers(params)
-        inout = ilayer
-        for layer in range(1, len(self.dlayers)):
-            inout = sigmoid(inout @ self.weight[layer] - self.bias[layer])
-            # print(f"inout={inout}")
-        return inout
+        return self.feedforward(ilayer)
 
 
 nnet = NeuralNetwork()

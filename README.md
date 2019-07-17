@@ -1,7 +1,7 @@
 # Introduction
 
 The idea of this project is to implement the classic example of a network that
-recognizes characters from the `mnist` database, based on intuition of how
+recognizes characters from the `mnist` database, based on my intuition of how
 neural networks should work, and thus being probably a very naive and simplistic
 approach.
 
@@ -18,7 +18,7 @@ The roadmap of this project is as follows:
 
 1. [x] Implement forward propagation
 2. [x] Implement batch or similar way of measuring the cost of the network
-3. [ ] Improve the network with a genetic algorithm
+3. [x] Improve the network with a genetic algorithm
 4. [ ] Improve the network with proper backpropagation
 
 ## 1 - Forward Propagation
@@ -58,7 +58,7 @@ implement a genetic algorithm for this, the logic for it will be implemented
 in a generic separate set of classes that will serve as mixins for the
 concrete individuals.
 
-# 4 - Backpropagation
+## 4 - Backpropagation
 
 And finally, the core of the project. Once the genetic algorithm version is
 done, we will finally try to implement proper backpropagation, dumping out the

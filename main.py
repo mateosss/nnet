@@ -5,60 +5,54 @@ import numpy as np
 from numpy import mean
 import mnist
 from nnet import nnet
-from genetic_nnet import GANeuralNetwork, NeuralGA
+from genetic_nnet import NeuralGA
 
-def main():
-    "Forward propagation specification"
-    # TODO: Try other hyperparameters
-    dlayers = [784, 16, 16, 10]
-    nnet.set_layers_description(dlayers)
-    params = list(nnet.get_random_params())
+# TODO: Try other hyperparameters
+DLAYERS = [784, 16, 16, 10]
 
-    BATCH_SIZE = 1
-    costs = [None] * BATCH_SIZE
-    for i, (label, image) in zip(range(BATCH_SIZE), mnist.read()):
-        # mnist.show(image)
-        # Run network
-        ninput = [pixel / 255 for row in image for pixel in row] # Normalized
-        guess: List[int] = nnet(params, ninput)
-        print(f"guess={guess}")
-        # Cost calculation
-        expected = [1 if i == label else 0 for i in range(10)]
-        costs[i] = sum((g - e)**2 for g, e in zip(guess, expected))
-        print(f"Running {i + 1}/{BATCH_SIZE} | Cost {costs[i]} \r", end='')
-    cost = mean(costs)
-    print(f"Average cost of {cost} after {BATCH_SIZE} runs")
+def save_params(params):
+    with open("best.py", "w") as f: # TODO: What a way to save data :)
+        f.write(f"params = {str(params)}")
+
+def load_params():
+    from best import params # TODO: Stop using best.py for saving # pylint: disable=E0401
+    return params
 
 def genetic_main():
-    ga = NeuralGA([784, 16, 16, 10], 350)
-    with open("best.py", "w") as f:
-        # print(str(ga.best))
-        f.write("params = ")
-        f.write(str(ga.best))
+    ga = NeuralGA([784, 16, 16, 10], 10)
+    save_params(ga.best)
     return ga.best
 
-def testing_one_of_the_trained(best=None):
-    if not best:
-        import best
-        best = best.params
-    dlayers = [784, 16, 16, 10]
-    nnet.set_layers_description(dlayers)
-    params = best
+# TODO: Report network confidence and cost, not only hits/misses
+def test_and_report_against(nn, samples, print_every=50):
+    hits = 0
+    for i, (label, image) in enumerate(samples):
+        ninput = [pixel / 255 for row in image for pixel in row] # Normalized
+        guess = nn.feedforward(ninput) # network guess
+        expected = [1 if i == label else 0 for i in range(10)]
+        guessed = [1 if i == max(guess) else 0 for i in guess] # pragmatic guess
+        hits += guessed == expected
+        if (i + 1) % print_every == 0:
+            print(
+                f"Run {i + 1}/{len(samples)}\n"
+                f"[guess] squashed [0, 1] = {np.round(np.interp(guess, [guess.min(), guess.max()], [0, 1]), 6)}\n"
+                f"[expected] = {expected}\n"
+            )
+    misses = len(samples) - hits
+    print(f"\nHits: {hits} | Misses: {misses} -> {100 * hits / len(samples)}%")
 
+def test_trained(params=None, head=100, tail=100):
+    "Tests a network with params against first `head` and last `tail` examples"
+    params = params if params else load_params()
+    nnet.set_layers_description(DLAYERS)
+    nnet.create_layers(params)
     mnist_db = list(mnist.read())
-    label, image = mnist_db[25001]
-    mnist.show(image)
+    print("[KNOWN]")
+    test_and_report_against(nnet, mnist_db[:head]) # Training dataset
+    print("[UNKNOWN]")
+    test_and_report_against(nnet, mnist_db[-tail:]) # Unknown dataset
 
-    # Run network
-    ninput = [pixel / 255 for row in image for pixel in row] # Normalized
-    guess = nnet(params, ninput)
-    expected = [1 if i == label else 0 for i in range(10)]
-    print(f"guess as int = {(guess * 1e8).astype(int)}")
-    print(f"guess squashed as int = {np.interp(guess, [guess.min(), guess.max()], [0, 1]).astype(int)}")
-    print(f"guess squashed = {np.round(np.interp(guess, [guess.min(), guess.max()], [0, 1]), 6)}")
-
-    print(f"expected = {expected}")
 
 if __name__ == '__main__':
     best_params = genetic_main()
-    testing_one_of_the_trained(best_params)
+    test_trained(best_params)
