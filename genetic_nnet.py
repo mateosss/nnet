@@ -14,6 +14,11 @@ class GANeuralNetwork(Subject, NeuralNetwork):
     _fitness: float
 
     def __init__(self, params):
+        """
+        Precondition: use set_layers_description() before any instanciation
+        so dlayers is initialized
+        """
+        super().__init__(GANeuralNetwork.dlayers, params)
         self._genome = params
         self._fitness = None
 
@@ -29,11 +34,13 @@ class GANeuralNetwork(Subject, NeuralNetwork):
     def fitness(self) -> float:
         return self.batch_cost() if not self._fitness else self._fitness
 
-    def batch_cost(self, batch_size=10):
+    def batch_cost(self, batch_size=10, random_samples=False):
         "Runs a random minibatch and returns average network cost"
         costs = [None] * batch_size
-        # db = sample(GANeuralNetwork.__mnist_db, batch_size) # Random samples
-        db = GANeuralNetwork.__mnist_db[:batch_size] # First samples
+        db = (
+            sample(GANeuralNetwork.__mnist_db, batch_size) if random_samples
+            else GANeuralNetwork.__mnist_db[:batch_size]
+        )
         for i, (label, image) in enumerate(db): # TODO: parallelize runs
             # Run network
             ninput = [pixel / 255 for row in image for pixel in row] # Normalized

@@ -9,8 +9,7 @@ class TestNeuralNetwork(unittest.TestCase):
 
     def test_get_random_params(self):
         dlayers = [1024, 32, 64, 47]
-        nnet = NeuralNetwork()
-        nnet.set_layers_description(dlayers)
+        nnet = NeuralNetwork(dlayers)
         params = nnet.get_random_params()
 
         weights = [n *  m for n, m in zip(dlayers, dlayers[1:])]
@@ -20,8 +19,7 @@ class TestNeuralNetwork(unittest.TestCase):
 
     def test_create_layers(self):
         dlayers = [1024, 32, 64, 47]
-        nnet = NeuralNetwork()
-        nnet.set_layers_description(dlayers)
+        nnet = NeuralNetwork(dlayers)
         params = nnet.get_random_params()
         nnet.create_layers(params)
 

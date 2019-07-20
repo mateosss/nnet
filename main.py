@@ -2,7 +2,7 @@
 
 import numpy as np
 import mnist
-from nnet import nnet
+from nnet import NeuralNetwork
 from genetic_nnet import NeuralGA
 
 # TODO: Improve program print output
@@ -46,8 +46,7 @@ def test_and_report_against(nn, samples, print_every=50):
 def test_trained(params=None, head=100, tail=100):
     "Tests a network with params against first `head` and last `tail` examples"
     params = params if params is not None else load_params()
-    nnet.set_layers_description(DLAYERS)
-    nnet.create_layers(params)
+    nnet = NeuralNetwork(DLAYERS, params)
     mnist_db = list(mnist.read())
     print("[KNOWN]")
     test_and_report_against(nnet, mnist_db[:head]) # Training dataset

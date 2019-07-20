@@ -3,16 +3,19 @@ import numpy as np
 from numpy.random import randn
 
 class NeuralNetwork:
-    """
-    Let n be "amount of neurons in current layer"
-    Let m be "amount of neurons in next layer"
-    """
-
     dlayers: List[int] # Layer description
     weight: List # List of (n + 1) * m matrices (+1 for bias)
+    run: bool # Has the network been run with the current weights?
 
-    def set_layers_description(self, dlayers):
+    def __init__(self, dlayers: List[int], params: List[int] = None):
+        """
+        dlayers: description of the network layers,
+        params: Parameters to create_layers, if None, then randoms will be used
+        """
         self.dlayers = dlayers
+        self.run = False
+        params = params if params is not None else self.get_random_params()
+        self.create_layers(params)
 
     # TODO: Understand and try other initializations as xavier and kaiming
     # see https://towardsdatascience.com/weight-initialization-in-neural-networks-a-journey-from-the-basics-to-kaiming-954fb9b47c79
@@ -40,6 +43,7 @@ class NeuralNetwork:
             w_LL_n1_m1, ..., w_LL_nN,mM
         ]
         """
+        self.run = False
         l = len(self.dlayers)
         self.weight = [None] * (l - 1)
         wsizes = [(n + 1) * m for n, m in zip(self.dlayers, self.dlayers[1:])]
@@ -60,6 +64,10 @@ class NeuralNetwork:
             inout = sigmoid(np.concatenate((inout, [1])) @ self.weight[layer])
         return inout
 
+    def get_error(self, expected: List[float]):
+        "Returns the mean squared error, expected has an output layer structure"
+        pass
+
     def __call__(self, params, ilayer):
         """
         params: List of params, same format as in get_random_params
@@ -68,6 +76,3 @@ class NeuralNetwork:
         """
         self.create_layers(params)
         return self.feedforward(ilayer)
-
-
-nnet = NeuralNetwork()
