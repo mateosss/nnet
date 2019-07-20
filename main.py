@@ -1,8 +1,6 @@
 "Main user of nnet module"
 
-from typing import List
 import numpy as np
-from numpy import mean
 import mnist
 from nnet import nnet
 from genetic_nnet import NeuralGA
@@ -12,11 +10,11 @@ DLAYERS = [784, 16, 16, 10]
 
 def save_params(params):
     with open("best.py", "w") as f: # TODO: What a way to save data :)
-        f.write(f"params = {str(params)}")
+        f.write(f"params = {str(params.tolist())}")
 
 def load_params():
     from best import params # TODO: Stop using best.py for saving # pylint: disable=E0401
-    return params
+    return np.array(params)
 
 def genetic_main():
     ga = NeuralGA([784, 16, 16, 10], 10)
@@ -43,7 +41,7 @@ def test_and_report_against(nn, samples, print_every=50):
 
 def test_trained(params=None, head=100, tail=100):
     "Tests a network with params against first `head` and last `tail` examples"
-    params = params if params else load_params()
+    params = params if params is not None else load_params()
     nnet.set_layers_description(DLAYERS)
     nnet.create_layers(params)
     mnist_db = list(mnist.read())

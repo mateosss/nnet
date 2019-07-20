@@ -67,6 +67,7 @@ and finally implementing them.
 
 # Nice Extras
 
+- [ ] Compare raw and algorithmic performance to real implementations
 - [ ] Perfect pylint score
 - [ ] MyPy linting
 - [ ] Good testing support

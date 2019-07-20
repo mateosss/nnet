@@ -14,7 +14,7 @@ class GANeuralNetwork(Subject, NeuralNetwork):
     _fitness: float
 
     def __init__(self, params):
-        self._genome = list(params)
+        self._genome = params
         self._fitness = None
 
     @classmethod
