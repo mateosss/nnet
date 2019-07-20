@@ -5,9 +5,13 @@ import mnist
 from nnet import nnet
 from genetic_nnet import NeuralGA
 
+# TODO: Improve program print output
+# TODO: Add argparse options to configure the run
+
 # TODO: Try other hyperparameters
 DLAYERS = [784, 16, 16, 10]
 
+# TODO: Save runs to a separate folder and don't overwrite them
 def save_params(params):
     with open("best.py", "w") as f: # TODO: What a way to save data :)
         f.write(f"params = {str(params.tolist())}")
