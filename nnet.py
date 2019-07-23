@@ -2,42 +2,42 @@ from typing import List
 import numpy as np
 from numpy.random import randn
 
-def star(self, l, r, k, j, i):
+def star(self, l, r, k, i, j):
     Alr = self.activation[l][r]
-    return Alr * (1 - Alr) * four(self, l, r, k, j, i)
+    return Alr * (1 - Alr) * four(self, l, r, k, i, j)
 
 # HACK: for memoizing just one instance
 # TODO: put inside class and keep the memoization
-def four(self, l, q, k, j, i):
+def four(self, l, q, k, i, j):
     if not hasattr(four, "cache"): four.cache = {}
-    args = (l,q,k,j,i)
+    args = (l,q,k,i,j)
 
     if args in four.cache:
       return four.cache[args]
     # TODO: It is called four because of my own note names, in which this
     # was the fourth formula, find a more descriptive name
-    # print(f"(l, q, k, j, i)={(l, q, k, j, i)}")
+    # print(f"(l, q, k, i, j)={(l, q, k, i, j)}")
     # IN l=0, q=0
-    # W  k=0, j=10, i=0
+    # W  k=0, i=10, j=0
     # dINlq/dWkji
     if l == 0:
         res = 0
     elif k >= l + 1:
         print(f"k >= l + 1 should not happen but {k} >= {l} + 1 happened")
         res = 0
-    elif k == l and q != i:
+    elif k == l and q != j:
         res = 0
-    elif k == l and q == i:
-        res = self.activation[l - 1][j]
+    elif k == l and q == j:
+        res = self.activation[l - 1][i]
     elif k < l:
         res = sum(
             self.weight[l - 1][r, q]
             * self.activation[l - 1][r]
-            * (1 - self.activation[l - 1][r]) * four(self, l - 1, r, k, j, i)
+            * (1 - self.activation[l - 1][r]) * four(self, l - 1, r, k, i, j)
             for r in range(self.dlayers[l + 1]) # +1 for dlayers input
         )
         # res = sum(
-        #     self.weight[l - 1][r, q] * star(self, l - 1, r, k, j, i)
+        #     self.weight[l - 1][r, q] * star(self, l - 1, r, k, i, j)
         #     for r in range(self.dlayers[l + 1]) # +1 for dlayers input
         # )
     four.cache[args] = res
@@ -135,11 +135,11 @@ class NeuralNetwork:
         for k in reversed(range(L + 1)):
             n = self.dlayers[k]
             m = self.dlayers[k + 1]
-            for i in range(m):
-                #print(f"k,i,n,m={(k,i,n,m)}")
-                for j in range(n):
-                    # print(f"k,i,j,n,m={(k,i,j,n,m)}")
-                    gradients[k][j, i] = sum(
+            for j in range(m):
+                #print(f"k,j,n,m={(k,j,n,m)}")
+                for i in range(n):
+                    # print(f"k,j,i,n,m={(k,j,i,n,m)}")
+                    gradients[k][i, j] = sum(
                         # TODO: replace L-2 with -1. or improve indexin,
                         # currently activation and weight length is
                         # len(dlayer) - 1 just to save on the input layer memory
@@ -147,19 +147,19 @@ class NeuralNetwork:
                         (self.activation[L][q] - expected[q])
                         * (1 - self.activation[L][q])
                         * self.activation[L][q]
-                        * four(self, L, q, k, j, i)
+                        * four(self, L, q, k, i, j)
                         for q in range(self.dlayers[-1])
                     )
-        # gradients = np.array([  # gradients[k, i, j] == dE/dWkij
+        # gradients = np.array([  # gradients[k, j, i] == dE/dWkij
         #     sum(
         #         (self.activation[L][q] - expected[q])
         #         * (1 - self.activation[L][q]) * self.activation[L][q]
-        #         * self.four(L, q, k, j, i)
+        #         * self.four(L, q, k, i, j)
         #         for q in range(self.dlayers[L])
         #     )
         #     for k in reversed(range(L))
-        #     for i in range(self.dlayers[k])
-        #     for j in range(self.dlayers[k - 1])
+        #     for j in range(self.dlayers[k])
+        #     for i in range(self.dlayers[k - 1])
         # ])
 
         #print(gradients[2].shape)
