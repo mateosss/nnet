@@ -30,15 +30,19 @@ def backpropagation_main():
     ninput = [pixel / 255 for row in image for pixel in row]
     expected = [1 if i == label else 0 for i in range(10)]
 
-    nnet = NeuralNetwork(DLAYERS)
-    for i in range(10):
+    # nnet = NeuralNetwork(DLAYERS, params=None)
+    nnet = NeuralNetwork(DLAYERS, params=load_params())
+    for i in range(1000000000000):
         guess = nnet.feedforward(ninput)
         cost = nnet.get_error(expected)
-        print(f"[{i + 1}] cost = {cost}, guess = {guess}")
-        nnet.backpropagate(expected)
+        print(f"[{i + 1}] cost = {cost}")
+        try:
+            nnet.backpropagate(expected)
+        except KeyboardInterrupt:
+            break
     guess = nnet.feedforward(ninput)
     cost = nnet.get_error(expected)
-    print(f"[{i + 1}] cost = {cost}, guess = {guess}")
+    print(f"[{i + 1}] cost = {cost}")
     save_params(nnet.params)
 
 # TODO: Report network confidence and cost, not only hits/misses

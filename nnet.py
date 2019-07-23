@@ -177,12 +177,14 @@ class NeuralNetwork:
         #print(self.weight[2][:-1,:])
         ##print("lasta")
         #return
+        e = 0.5
+        a = 0.5
         if hasattr(self, "oldgradients"):
           for w, g, o in zip(self.weight, gradients, self.oldgradients):
-            w[:-1,:] -= 1*g + 1*o
+            w[:-1,:] -= e*g + a*o
         else:
           for w, g in zip(self.weight, gradients):
-            w[:-1,:] -= 1*g
+            w[:-1,:] -= e*g
 
         self.oldgradients = gradients
         del four.cache

@@ -2,6 +2,8 @@ import unittest
 import numpy as np
 from nnet import NeuralNetwork
 
+# TODO: Comment intent of each individual assertion
+
 GM = 10 # Gaussian bell curve maximum
 
 class TestNeuralNetwork(unittest.TestCase):
@@ -37,6 +39,8 @@ class TestNeuralNetwork(unittest.TestCase):
         self.assertTrue(all(
             -GM <= p and p <= GM for w in nnet.weight for p in np.nditer(w)
         ))
+
+        # TODO: Check that all bias activations are 1
 
     def test_nnet(self):
         pass
