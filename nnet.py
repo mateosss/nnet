@@ -2,9 +2,40 @@ from typing import List
 import numpy as np
 from numpy.random import randn
 
+# hack for memoize one instance
+def four(self, l, q, k, j, i):
+    if not hasattr(four, "cache"): four.cache = {}
+    args = (l,q,k,j,i)
+
+    if args in four.cache:
+      return four.cache[args]
+    # TODO: It is called four because of my own note names, in which this
+    # was the fourth formula, find a more descriptive name
+    # print(f"(l, q, k, j, i)={(l, q, k, j, i)}")
+    # IN l=0, q=0
+    # W  k=0, j=10, i=0
+    # dINlq/dWkji
+    if l == 0:
+      res = 0
+    else:
+        res = (
+            # what should happen when l == 0 ?
+            self.activation[l - 1][j] if k == l
+            else sum(
+                self.weight[l - 1][r, q]
+                * self.activation[l - 1][r]
+                * (1 - self.activation[l - 1][r]) * four(self, l - 1, r, k, j, i)
+                for r in range(self.dlayers[l + 1]) # +1 for dlayers input
+            )
+        )
+    four.cache[args] = res
+    return res
+
+
 class NeuralNetwork:
     dlayers: List[int] # Layer description
     weight: List # List of (n + 1) * m matrices (+1 for bias)
+    activation: List # List of n length vectors
     run: bool # Has the network been run with the current weights?
 
     def __init__(self, dlayers: List[int], params: List[int] = None):
@@ -14,8 +45,14 @@ class NeuralNetwork:
         """
         self.dlayers = dlayers
         self.run = False
+        self.activation = np.array([np.zeros(n) for n in dlayers[1:]])
+        # Set weights
         params = params if params is not None else self.get_random_params()
         self.create_layers(params)
+
+    def __call__(self, params, ilayer):
+        self.create_layers(params)
+        return self.feedforward(ilayer)
 
     # TODO: Understand and try other initializations as xavier and kaiming
     # see https://towardsdatascience.com/weight-initialization-in-neural-networks-a-journey-from-the-basics-to-kaiming-954fb9b47c79
@@ -56,23 +93,97 @@ class NeuralNetwork:
             )
 
     def feedforward(self, ilayer):
-        "Forward propagation of the network, returns last layer activations"
+        """
+        Forward propagation of the network, fill activation vectors
+        ilayer: Normalized input layer scaled in range [0, 1]
+        returns: last layer activations (the guess)
+        """
         # TODO: Try more activation functions as ReLU and others
         sigmoid = lambda x: 1 / (1 + np.exp(-x))
         inout = ilayer
         for layer in range(0, len(self.dlayers) - 1):
             inout = sigmoid(np.concatenate((inout, [1])) @ self.weight[layer])
+            self.activation[layer] = inout
         return inout
 
-    def get_error(self, expected: List[float]):
-        "Returns the mean squared error, expected has an output layer structure"
-        pass
+    @property
+    def params(self):
+        """Return parameter list that can be used to recreate this network."""
+        return np.array([w for m in self.weight for r in m for w in r])
 
-    def __call__(self, params, ilayer):
-        """
-        params: List of params, same format as in get_random_params
-        ilayer: Normalized input layer scaled in range [0, 1]
-        returns: last layer activations (the guess)
-        """
-        self.create_layers(params)
-        return self.feedforward(ilayer)
+    def get_error(self, expected: List[float]):
+        """Return mean squared error, expected has an output structures."""
+        return sum((g - e)**2 for g, e in zip(self.activation[-1], expected))
+
+    def fouar(self, l, q, k, j, i):
+        # TODO: It is called four because of my own note names, in which this
+        # was the fourth formula, find a more descriptive name
+        # print(f"(l, q, k, j, i)={(l, q, k, j, i)}")
+        # IN l=0, q=0
+        # W  k=0, j=10, i=0
+        # dINlq/dWkji
+        if l == 0:
+          return 0
+        return (
+            # what should happen when l == 0 ?
+            self.activation[l - 1][j] if k == l
+            else sum(
+                self.weight[l - 1][r, q]
+                * self.activation[l - 1][r]
+                * (1 - self.activation[l - 1][r]) * four(self, l - 1, r, k, j, i)
+                for r in range(self.dlayers[l + 1]) # +1 for dlayers input
+            )
+        )
+
+    def backpropagate(self, expected):
+        L = len(self.dlayers) - 2 # Last layer index in weights and activations
+        gradients = np.array([
+            np.empty((n, m)) for n, m in zip(self.dlayers, self.dlayers[1:])
+        ])
+        for k in reversed(range(L + 1)):
+            n = self.dlayers[k]
+            m = self.dlayers[k + 1]
+            for i in range(m):
+                #print(f"k,i,n,m={(k,i,n,m)}")
+                for j in range(n):
+                    # print(f"k,i,j,n,m={(k,i,j,n,m)}")
+                    gradients[k][j, i] = sum(
+                        # TODO: replace L-2 with -1. or improve indexin,
+                        # currently activation and weight length is
+                        # len(dlayer) - 1 just to save on the input layer memory
+                        # initizalization, is it worth it?
+                        (self.activation[L][q] - expected[q])
+                        * (1 - self.activation[L][q])
+                        * self.activation[L][q]
+                        * four(self, L, q, k, j, i)
+                        for q in range(self.dlayers[-1])
+                    )
+        # gradients = np.array([  # gradients[k, i, j] == dE/dWkij
+        #     sum(
+        #         (self.activation[L][q] - expected[q])
+        #         * (1 - self.activation[L][q]) * self.activation[L][q]
+        #         * self.four(L, q, k, j, i)
+        #         for q in range(self.dlayers[L])
+        #     )
+        #     for k in reversed(range(L))
+        #     for i in range(self.dlayers[k])
+        #     for j in range(self.dlayers[k - 1])
+        # ])
+
+        #print(gradients[2].shape)
+        #print(self.weight[2][:-1,:].shape)
+        #print(self.weight[2][:-1,:])
+        #self.weight[2][:-1,:] -= gradients[2]
+        #print(self.weight[2][:-1,:])
+        ##print("lasta")
+        #return
+        if hasattr(self, "oldgradients"):
+          for w, g, o in zip(self.weight, gradients, self.oldgradients):
+            w[:-1,:] -= 1*g + 1*o
+        else:
+          for w, g in zip(self.weight, gradients):
+            w[:-1,:] -= 1*g
+
+        self.oldgradients = gradients
+        del four.cache
+        # self.weight -= gradients # TODO: for this to work self.weight should be np.array and not list

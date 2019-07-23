@@ -21,9 +21,25 @@ def load_params():
     return np.array(params)
 
 def genetic_main():
-    ga = NeuralGA([784, 16, 16, 10], 10)
+    ga = NeuralGA(DLAYERS, 10)
     save_params(ga.best)
     return ga.best
+
+def backpropagation_main():
+    label, image = next(mnist.read())
+    ninput = [pixel / 255 for row in image for pixel in row]
+    expected = [1 if i == label else 0 for i in range(10)]
+
+    nnet = NeuralNetwork(DLAYERS)
+    for i in range(10):
+        guess = nnet.feedforward(ninput)
+        cost = nnet.get_error(expected)
+        print(f"[{i + 1}] cost = {cost}, guess = {guess}")
+        nnet.backpropagate(expected)
+    guess = nnet.feedforward(ninput)
+    cost = nnet.get_error(expected)
+    print(f"[{i + 1}] cost = {cost}, guess = {guess}")
+    save_params(nnet.params)
 
 # TODO: Report network confidence and cost, not only hits/misses
 def test_and_report_against(nn, samples, print_every=50):
@@ -37,7 +53,9 @@ def test_and_report_against(nn, samples, print_every=50):
         if (i + 1) % print_every == 0:
             print(
                 f"Run {i + 1}/{len(samples)}\n"
-                f"[guess] squashed [0, 1] = {np.round(np.interp(guess, [guess.min(), guess.max()], [0, 1]), 6)}\n"
+                f"""[guess] squashed [0, 1] = {np.round(np.interp(
+                    guess, [guess.min(), guess.max()], [0, 1]
+                ), 6)}\n"""
                 f"[expected] = {expected}\n"
             )
     misses = len(samples) - hits
@@ -55,5 +73,6 @@ def test_trained(params=None, head=100, tail=100):
 
 
 if __name__ == '__main__':
-    best_params = genetic_main()
-    test_trained(best_params)
+    # best_params = genetic_main()
+    # test_trained(best_params)
+    backpropagation_main()
