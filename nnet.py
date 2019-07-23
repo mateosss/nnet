@@ -2,7 +2,12 @@ from typing import List
 import numpy as np
 from numpy.random import randn
 
-# hack for memoize one instance
+def star(self, l, r, k, j, i):
+    Alr = self.activation[l][r]
+    return Alr * (1 - Alr) * four(self, l, r, k, j, i)
+
+# HACK: for memoizing just one instance
+# TODO: put inside class and keep the memoization
 def four(self, l, q, k, j, i):
     if not hasattr(four, "cache"): four.cache = {}
     args = (l,q,k,j,i)
@@ -16,18 +21,25 @@ def four(self, l, q, k, j, i):
     # W  k=0, j=10, i=0
     # dINlq/dWkji
     if l == 0:
-      res = 0
-    else:
-        res = (
-            # what should happen when l == 0 ?
-            self.activation[l - 1][j] if k == l
-            else sum(
-                self.weight[l - 1][r, q]
-                * self.activation[l - 1][r]
-                * (1 - self.activation[l - 1][r]) * four(self, l - 1, r, k, j, i)
-                for r in range(self.dlayers[l + 1]) # +1 for dlayers input
-            )
+        res = 0
+    elif k >= l + 1:
+        print(f"k >= l + 1 should not happen but {k} >= {l} + 1 happened")
+        res = 0
+    elif k == l and q != i:
+        res = 0
+    elif k == l and q == i:
+        res = self.activation[l - 1][j]
+    elif k < l:
+        res = sum(
+            self.weight[l - 1][r, q]
+            * self.activation[l - 1][r]
+            * (1 - self.activation[l - 1][r]) * four(self, l - 1, r, k, j, i)
+            for r in range(self.dlayers[l + 1]) # +1 for dlayers input
         )
+        # res = sum(
+        #     self.weight[l - 1][r, q] * star(self, l - 1, r, k, j, i)
+        #     for r in range(self.dlayers[l + 1]) # +1 for dlayers input
+        # )
     four.cache[args] = res
     return res
 
@@ -114,26 +126,6 @@ class NeuralNetwork:
     def get_error(self, expected: List[float]):
         """Return mean squared error, expected has an output structures."""
         return sum((g - e)**2 for g, e in zip(self.activation[-1], expected))
-
-    def fouar(self, l, q, k, j, i):
-        # TODO: It is called four because of my own note names, in which this
-        # was the fourth formula, find a more descriptive name
-        # print(f"(l, q, k, j, i)={(l, q, k, j, i)}")
-        # IN l=0, q=0
-        # W  k=0, j=10, i=0
-        # dINlq/dWkji
-        if l == 0:
-          return 0
-        return (
-            # what should happen when l == 0 ?
-            self.activation[l - 1][j] if k == l
-            else sum(
-                self.weight[l - 1][r, q]
-                * self.activation[l - 1][r]
-                * (1 - self.activation[l - 1][r]) * four(self, l - 1, r, k, j, i)
-                for r in range(self.dlayers[l + 1]) # +1 for dlayers input
-            )
-        )
 
     def backpropagate(self, expected):
         L = len(self.dlayers) - 2 # Last layer index in weights and activations
