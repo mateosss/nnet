@@ -127,7 +127,7 @@ class NeuralNetwork:
         """Return mean squared error, expected has an output structures."""
         return sum((g - e)**2 for g, e in zip(self.activation[-1], expected))
 
-    def backpropagate(self, expected):
+    def get_error_gradient(self, expected):
         L = len(self.dlayers) - 2 # Last layer index in weights and activations
         gradients = np.array([
             np.empty((n, m)) for n, m in zip(self.dlayers, self.dlayers[1:])
@@ -140,43 +140,45 @@ class NeuralNetwork:
                 for i in range(n):
                     # print(f"k,j,i,n,m={(k,j,i,n,m)}")
                     gradients[k][i, j] = sum(
-                        # TODO: replace L-2 with -1. or improve indexin,
-                        # currently activation and weight length is
-                        # len(dlayer) - 1 just to save on the input layer memory
-                        # initizalization, is it worth it?
                         (self.activation[L][q] - expected[q])
                         * (1 - self.activation[L][q])
                         * self.activation[L][q]
                         * four(self, L, q, k, i, j)
                         for q in range(self.dlayers[-1])
                     )
-        # gradients = np.array([  # gradients[k, j, i] == dE/dWkij
-        #     sum(
-        #         (self.activation[L][q] - expected[q])
-        #         * (1 - self.activation[L][q]) * self.activation[L][q]
-        #         * self.four(L, q, k, i, j)
-        #         for q in range(self.dlayers[L])
-        #     )
-        #     for k in reversed(range(L))
-        #     for j in range(self.dlayers[k])
-        #     for i in range(self.dlayers[k - 1])
-        # ])
+        return gradients
 
-        #print(gradients[2].shape)
-        #print(self.weight[2][:-1,:].shape)
-        #print(self.weight[2][:-1,:])
-        #self.weight[2][:-1,:] -= gradients[2]
-        #print(self.weight[2][:-1,:])
-        ##print("lasta")
-        #return
+    def get_error_gradient2(self, expected):  # TODO: this one has in account the biases, make the original too
+        L = len(self.dlayers) - 2 # Last layer index in weights and activations
+        gradients = np.array([
+            np.empty((n + 1, m)) for n, m in zip(self.dlayers, self.dlayers[1:])
+        ])
+        for k in reversed(range(L + 1)):
+            n = self.dlayers[k]
+            m = self.dlayers[k + 1]
+            for j in range(m):
+                #print(f"k,j,n,m={(k,j,n,m)}")
+                for i in range(n):
+                    # print(f"k,j,i,n,m={(k,j,i,n,m)}")
+                    gradients[k][i, j] = sum(
+                        (self.activation[L][q] - expected[q])
+                        * (1 - self.activation[L][q])
+                        * self.activation[L][q]
+                        * four(self, L, q, k, i, j)
+                        for q in range(self.dlayers[-1])
+                    )
+        return gradients
+
+    def backpropagate(self, expected):
+        gradients = self.get_error_gradient(expected)
         e = 0.5
         a = 0.5
         if hasattr(self, "oldgradients"):
-          for w, g, o in zip(self.weight, gradients, self.oldgradients):
-            w[:-1,:] -= e*g + a*o
+            for w, g, o in zip(self.weight, gradients, self.oldgradients):
+                w[:-1, :] -= e * g + a * o
         else:
-          for w, g in zip(self.weight, gradients):
-            w[:-1,:] -= e*g
+            for w, g in zip(self.weight, gradients):
+                w[:-1, :] -= e * g
 
         self.oldgradients = gradients
         del four.cache

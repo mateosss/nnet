@@ -30,12 +30,12 @@ def backpropagation_main():
     ninput = [pixel / 255 for row in image for pixel in row]
     expected = [1 if i == label else 0 for i in range(10)]
 
-    # nnet = NeuralNetwork(DLAYERS, params=None)
-    nnet = NeuralNetwork(DLAYERS, params=load_params())
+    nnet = NeuralNetwork(DLAYERS, params=None)
+    # nnet = NeuralNetwork(DLAYERS, params=load_params())
     for i in range(1000000000000):
         guess = nnet.feedforward(ninput)
         cost = nnet.get_error(expected)
-        print(f"[{i + 1}] cost = {cost}")
+        print(f"[{i + 1}] cost = {cost}, guess = {guess}")
         try:
             nnet.backpropagate(expected)
         except KeyboardInterrupt:
