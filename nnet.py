@@ -2,6 +2,8 @@ from typing import List
 import numpy as np
 from numpy.random import randn
 
+np.random.seed(1)
+
 def star(self, l, r, k, i, j):
     Alr = self.activation[l][r]
     return Alr * (1 - Alr) * four(self, l, r, k, i, j)
@@ -57,7 +59,9 @@ class NeuralNetwork:
         """
         self.dlayers = dlayers
         self.run = False
-        self.activation = np.array([np.zeros(n) for n in dlayers[1:]])
+        self.activation = np.array([
+            np.concatenate((np.zeros(n), [1])) for n in dlayers[1:]
+        ])
         # Set weights
         params = params if params is not None else self.get_random_params()
         self.create_layers(params)
@@ -115,7 +119,7 @@ class NeuralNetwork:
         inout = ilayer
         for layer in range(0, len(self.dlayers) - 1):
             inout = sigmoid(np.concatenate((inout, [1])) @ self.weight[layer])
-            self.activation[layer] = inout
+            self.activation[layer] = np.concatenate((inout, [1]))
         return inout
 
     @property
@@ -124,31 +128,10 @@ class NeuralNetwork:
         return np.array([w for m in self.weight for r in m for w in r])
 
     def get_error(self, expected: List[float]):
-        """Return mean squared error, expected has an output structures."""
+        """Return mean squared error, expected has an output-like structure."""
         return sum((g - e)**2 for g, e in zip(self.activation[-1], expected))
 
     def get_error_gradient(self, expected):
-        L = len(self.dlayers) - 2 # Last layer index in weights and activations
-        gradients = np.array([
-            np.empty((n, m)) for n, m in zip(self.dlayers, self.dlayers[1:])
-        ])
-        for k in reversed(range(L + 1)):
-            n = self.dlayers[k]
-            m = self.dlayers[k + 1]
-            for j in range(m):
-                #print(f"k,j,n,m={(k,j,n,m)}")
-                for i in range(n):
-                    # print(f"k,j,i,n,m={(k,j,i,n,m)}")
-                    gradients[k][i, j] = sum(
-                        (self.activation[L][q] - expected[q])
-                        * (1 - self.activation[L][q])
-                        * self.activation[L][q]
-                        * four(self, L, q, k, i, j)
-                        for q in range(self.dlayers[-1])
-                    )
-        return gradients
-
-    def get_error_gradient2(self, expected):  # TODO: this one has in account the biases, make the original too
         L = len(self.dlayers) - 2 # Last layer index in weights and activations
         gradients = np.array([
             np.empty((n + 1, m)) for n, m in zip(self.dlayers, self.dlayers[1:])
@@ -158,7 +141,7 @@ class NeuralNetwork:
             m = self.dlayers[k + 1]
             for j in range(m):
                 #print(f"k,j,n,m={(k,j,n,m)}")
-                for i in range(n):
+                for i in range(n + 1):  # +1 for bias neuron
                     # print(f"k,j,i,n,m={(k,j,i,n,m)}")
                     gradients[k][i, j] = sum(
                         (self.activation[L][q] - expected[q])
@@ -175,10 +158,10 @@ class NeuralNetwork:
         a = 0.5
         if hasattr(self, "oldgradients"):
             for w, g, o in zip(self.weight, gradients, self.oldgradients):
-                w[:-1, :] -= e * g + a * o
+                w[...] -= e * g + a * o
         else:
             for w, g in zip(self.weight, gradients):
-                w[:-1, :] -= e * g
+                w[...] -= e * g
 
         self.oldgradients = gradients
         del four.cache
