@@ -12,10 +12,10 @@ def star(self, l, r, k, i, j):
 # TODO: put inside class and keep the memoization
 def four(self, l, q, k, i, j):
     if not hasattr(four, "cache"): four.cache = {}
-    args = (l,q,k,i,j)
+    args = (l, q, k, i, j)
 
     if args in four.cache:
-      return four.cache[args]
+        return four.cache[args]
     # TODO: It is called four because of my own note names, in which this
     # was the fourth formula, find a more descriptive name
     # print(f"(l, q, k, i, j)={(l, q, k, i, j)}")
@@ -31,6 +31,8 @@ def four(self, l, q, k, i, j):
         res = 0
     elif k == l and q == j:
         res = self.activation[l - 1][i]
+    elif k == l - 1: # Special case for performance, same as k < l case
+        res = self.activation[k][j] * self.weight[k + 1][j, q]
     elif k < l:
         res = sum(
             self.weight[l - 1][r, q]
