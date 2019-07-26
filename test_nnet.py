@@ -1,10 +1,11 @@
 import unittest
 import numpy as np
+from numpy.linalg import norm
 import mnist
 from nnet import NeuralNetwork
-
 # TODO: Comment intent of each individual assertion
 
+np.random.seed(1)  # TODO: Remove?
 GM = 10 # Gaussian bell curve maximum
 
 class TestNeuralNetwork(unittest.TestCase):
@@ -49,11 +50,10 @@ class TestNeuralNetwork(unittest.TestCase):
         expected = [1 if i == label else 0 for i in range(10)]
         nnet = NeuralNetwork([784, 16, 16, 10])
 
-        epsilon = 1e-4
+        epsilon = 1e-5
         numgrad = [np.empty(wmatrix.shape) for wmatrix in nnet.weight]
 
         for k, wmatrix in enumerate(nnet.weight):
-            print(k)
             for i, w in np.ndenumerate(wmatrix):
                 wmatrix[i] = w - epsilon
                 nnet.feedforward(ninput)
@@ -63,18 +63,25 @@ class TestNeuralNetwork(unittest.TestCase):
                 b = nnet.get_error(expected)
                 numgrad[k][i] = (b - a) / 2 * epsilon
                 wmatrix[i] = w
-        error_gradient = nnet.get_error_gradient2(expected)
-        print(numgrad[-1])  # TODO: Remove print
-        print(error_gradient[-1])  # TODO: Remove print
-        print(numgrad / error_gradient)  # TODO: Remove print
+        error_gradient = nnet.get_error_gradient(expected)
+
+        unit = lambda v: v / norm(v) if (v != 0).any() else np.zeros(v.shape)
+
         for k in range(len(nnet.weight)):
-            print(np.linalg.norm(error_gradient[k] - numgrad[k]))
-            print(np.linalg.norm(error_gradient[k] + numgrad[k]))
-            print("k=", k,
-                np.linalg.norm(error_gradient[k] - numgrad[k]) /
-                np.linalg.norm(error_gradient[k] + numgrad[k])
-            )
-        # self.assertTrue(np.allclose(numgrad, error_gradient))
+            ag = error_gradient[k]
+            ng = numgrad[k]
+            print(f"custom = {norm(unit(ag) - unit(ng))}")
+            print(f"derived from cs231 = {norm(unit(ag) * norm(ng) - ng) / max(norm(ag), norm(ng))}")
+            # http://cs231n.github.io/neural-networks-3/#gradcheck
+            # CS231 way seems to not work, because it compares only magnitudes
+            # and not the direction of the analitical and numerical gradients
+            # what happens in this case is that the ag is waaays bigger
+            # than the numerical, however, the direction seems to be pointing
+            # in the same way by my custom and the derived from cs231 formulas
+            # but, as this formulas are out of the hat, I don't know what
+            # would be a good value for them
+            # TODO: Investigate for a good formula, and what result to expect
+            # TODO: Put a proper assertion in this test following that formula
 
     def test_nnet(self):
         pass
