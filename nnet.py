@@ -6,45 +6,59 @@ np.random.seed(1)
 
 def star(self, l, r, k, i, j):
     Alr = self.activation[l][r]
-    return Alr * (1 - Alr) * four(self, l, r, k, i, j)
+    return Alr * (1 - Alr) * dadw(self, l, r, k, i, j)
 
 # HACK: for memoizing just one instance
 # TODO: put inside class and keep the memoization
-def four(self, l, q, k, i, j):
-    if not hasattr(four, "cache"): four.cache = {}
-    args = (l, q, k, i, j)
+def dadw(self, l, q, k, i, j):
+    """Derivative of activation q of layer l (Alq) with respect to weight from
+    neuron i in layer k to neuron j in layer k + 1 (Wkij)
+    """
+    assert l >= 0 and q >= 0 and k >= 0 and i >= 0 and j >= 0, (
+        f"Not all positive: l, q, k, i, j={l, q, k, i, j}"
+    )
 
-    if args in four.cache:
-        return four.cache[args]
-    # TODO: It is called four because of my own note names, in which this
-    # was the fourth formula, find a more descriptive name
-    # print(f"(l, q, k, i, j)={(l, q, k, i, j)}")
-    # IN l=0, q=0
-    # W  k=0, i=10, j=0
-    # dINlq/dWkji
-    if l == 0:
+    # Memoization stuff
+    if not hasattr(dadw, "cache"):
+        dadw.cache = {}
+    args = (l, q, k, i, j)
+    if args in dadw.cache:
+        return dadw.cache[args]
+
+    gprime = self.activation[l][q] * (1 - self.activation[l][q])
+
+    if l < 0:  # Out of range neuron
+        print(f"l={l} < 0, it should not happen")
         res = 0
-    elif k >= l + 1:
-        print(f"k >= l + 1 should not happen but {k} >= {l} + 1 happened")
+    elif l == 0:  # No weight affects an input neuron
         res = 0
-    elif k == l and q != j:
+    elif k >= l:  # Weight to the right of neuron
+        print(f"k={k} >= l={l}, it should not happen")
         res = 0
-    elif k == l and q == j:
+    elif q == self.dlayers[l]:  # is bias neuron, nothing changes its value
+        print(f"Executing on a bias neuron, it should not happen, l={l}, q={q}")
+        res = 0
+    elif k == l - 1 and j != q:  # Weight just before neuron but disconnected
+        res = 0
+    elif k == l - 1 and j == q:  # Weight just before neuron and connected
         res = self.activation[l - 1][i]
-    elif k == l - 1: # Special case for performance, same as k < l case
-        res = self.activation[k][j] * self.weight[k + 1][j, q]
-    elif k < l:
-        res = sum(
-            self.weight[l - 1][r, q]
-            * self.activation[l - 1][r]
-            * (1 - self.activation[l - 1][r]) * four(self, l - 1, r, k, i, j)
-            for r in range(self.dlayers[l + 1]) # +1 for dlayers input
+    # Uncomment for 2x performance gains, not necessary for correctness
+    elif k == l - 2:  # Special case for performance, not needed for correctness
+        res = (
+            self.weight[l - 1][j, q]
+            * self.activation[l - 1][j] * (1 - self.activation[l - 1][j])
+            * self.activation[l - 2][i]
         )
-        # res = sum(
-        #     self.weight[l - 1][r, q] * star(self, l - 1, r, k, i, j)
-        #     for r in range(self.dlayers[l + 1]) # +1 for dlayers input
-        # )
-    four.cache[args] = res
+    elif k < l - 1:
+        res = sum(
+            self.weight[l - 1][r, q] * dadw(self, l - 1, r, k, i, j)
+            for r in range(self.dlayers[l - 1])
+        )
+    else:
+        print("Should never reach this execution branch")
+
+    res *= gprime
+    dadw.cache[args] = res
     return res
 
 
@@ -62,7 +76,7 @@ class NeuralNetwork:
         self.dlayers = dlayers
         self.run = False
         self.activation = np.array([
-            np.concatenate((np.zeros(n), [1])) for n in dlayers[1:]
+            np.concatenate((np.zeros(n), [1])) for n in dlayers
         ])
         # Set weights
         params = params if params is not None else self.get_random_params()
@@ -118,11 +132,13 @@ class NeuralNetwork:
         """
         # TODO: Try more activation functions as ReLU and others
         sigmoid = lambda x: 1 / (1 + np.exp(-x))
-        inout = ilayer
-        for layer in range(0, len(self.dlayers) - 1):
-            inout = sigmoid(np.concatenate((inout, [1])) @ self.weight[layer])
-            self.activation[layer] = np.concatenate((inout, [1]))
-        return inout
+        self.activation[0] = np.concatenate((ilayer, [1]))
+        for layer in range(1, len(self.dlayers)):
+            self.activation[layer] = np.concatenate((
+                sigmoid(self.activation[layer - 1] @ self.weight[layer - 1]),
+                [1],
+            ))
+        return self.activation[-1][:-1]  # Remove bias neuron from result
 
     @property
     def params(self):
@@ -134,22 +150,25 @@ class NeuralNetwork:
         return sum((g - e)**2 for g, e in zip(self.activation[-1], expected))
 
     def get_error_gradient(self, expected):
-        L = len(self.dlayers) - 2 # Last layer index in weights and activations
+        L = len(self.dlayers) - 1 # Last layer index
         gradients = np.array([
             np.empty((n + 1, m)) for n, m in zip(self.dlayers, self.dlayers[1:])
         ])
-        for k in reversed(range(L + 1)):
+
+        assert all(
+            g.shape == w.shape for g, w in zip(gradients, self.weight)
+        ), "gradients is not the same shape as weights"
+
+        for k in reversed(range(len(self.dlayers) - 1)):
             n = self.dlayers[k]
             m = self.dlayers[k + 1]
             for j in range(m):
-                #print(f"k,j,n,m={(k,j,n,m)}")
                 for i in range(n + 1):  # +1 for bias neuron
-                    # print(f"k,j,i,n,m={(k,j,i,n,m)}")
                     gradients[k][i, j] = sum(
                         (self.activation[L][q] - expected[q])
-                        * (1 - self.activation[L][q])
-                        * self.activation[L][q]
-                        * four(self, L, q, k, i, j)
+                        # * self.activation[L][q]
+                        # * (1 - self.activation[L][q])
+                        * dadw(self, L, q, k, i, j)
                         for q in range(self.dlayers[-1])
                     )
         return gradients
@@ -166,5 +185,5 @@ class NeuralNetwork:
                 w[...] -= e * g
 
         self.oldgradients = gradients
-        del four.cache
+        del dadw.cache
         # self.weight -= gradients # TODO: for this to work self.weight should be np.array and not list
