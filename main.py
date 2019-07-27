@@ -26,23 +26,38 @@ def genetic_main():
     return ga.best
 
 def backpropagation_main():
-    label, image = next(mnist.read())
-    ninput = [pixel / 255 for row in image for pixel in row]
-    expected = [1 if i == label else 0 for i in range(10)]
+    labels, images = zip(*list(mnist.read()))
+    batch_size = 16
+    ninputs = [
+        [pixel / 255 for row in image for pixel in row]
+        for image in images[:batch_size]
+    ]
+    expected_outputs = [
+        [1 if i == label else 0 for i in range(10)]
+        for label in labels[:batch_size]
+    ]
+    print("here")
 
+    # ninput = list(range(2))
+    # nnet = NeuralNetwork([2, 1, 3, 2], params=None)
     nnet = NeuralNetwork(DLAYERS, params=None)
     # nnet = NeuralNetwork(DLAYERS, params=load_params())
-    for i in range(1000000000000):
-        guess = nnet.feedforward(ninput)
-        cost = nnet.get_error(expected)
-        print(f"[{i + 1}] cost = {cost}, guess = {guess}")
+    cost_gradient = [None] * batch_size
+    cost = np.empty(batch_size)
+    for j in range(1024):
         try:
-            nnet.backpropagate(expected)
+            for i, (ninput, expected) in enumerate(zip(ninputs, expected_outputs)):
+                guess = nnet.feedforward(ninput)
+                cost[i] = nnet.get_error(expected)
+                cost_gradient[i] = nnet.get_error_gradient(expected)
         except KeyboardInterrupt:
             break
-    guess = nnet.feedforward(ninput)
-    cost = nnet.get_error(expected)
-    print(f"[{i + 1}] cost = {cost}")
+        print(f"[{j + 1}] cost = {cost.mean()}")
+        batch_gradient = np.mean(cost_gradient, axis=0)
+        nnet.backpropagate(gradients=batch_gradient)
+    # guess = nnet.feedforward(ninput)
+    # cost = nnet.get_error(expected)
+    # print(f"[{i + 1}] cost = {cost}")
     save_params(nnet.params)
 
 # TODO: Report network confidence and cost, not only hits/misses

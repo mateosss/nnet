@@ -14,10 +14,6 @@ def dadw(self, l, q, k, i, j):
     """Derivative of activation q of layer l (Alq) with respect to weight from
     neuron i in layer k to neuron j in layer k + 1 (Wkij)
     """
-    assert l >= 0 and q >= 0 and k >= 0 and i >= 0 and j >= 0, (
-        f"Not all positive: l, q, k, i, j={l, q, k, i, j}"
-    )
-
     # Memoization stuff
     if not hasattr(dadw, "cache"):
         dadw.cache = {}
@@ -25,10 +21,9 @@ def dadw(self, l, q, k, i, j):
     if args in dadw.cache:
         return dadw.cache[args]
 
-    gprime = self.activation[l][q] * (1 - self.activation[l][q])
-
-    if l < 0:  # Out of range neuron
-        print(f"l={l} < 0, it should not happen")
+    # Conditional factor
+    if l < 0 or q < 0 or k < 0 or i < 0 or j < 0:  # Out of range indexes
+        print(f"Negative parameter found: l, q, k, i, j={l, q, k, i, j}")
         res = 0
     elif l == 0:  # No weight affects an input neuron
         res = 0
@@ -56,7 +51,10 @@ def dadw(self, l, q, k, i, j):
     else:
         print("Should never reach this execution branch")
 
-    res *= gprime
+    # Derivative of activation function factor
+    res *= self.activation[l][q] * (1 - self.activation[l][q]) # g'(in^l_q)
+
+    # Cache it
     dadw.cache[args] = res
     return res
 
@@ -168,15 +166,19 @@ class NeuralNetwork:
                     )
         return gradients
 
-    def backpropagate(self, expected):
-        gradients = self.get_error_gradient(expected)
-        e = 0.5
-        a = 0.5
+    def backpropagate(self, gradients=None, expected=None):
+        assert gradients is not None or expected is not None
+        if gradients is None:
+            gradients = self.get_error_gradient(expected)
+        e = 1
+        a = 0
         if hasattr(self, "oldgradients"):
             for w, g, o in zip(self.weight, gradients, self.oldgradients):
+                np.linalg.norm(g)
                 w[...] -= e * g + a * o
         else:
             for w, g in zip(self.weight, gradients):
+                np.linalg.norm(g)
                 w[...] -= e * g
 
         self.oldgradients = gradients
