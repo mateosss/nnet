@@ -42,7 +42,6 @@ def dadw(self, l, q, k, i, j):
         res = 0
     elif k == l - 1 and j == q:  # Weight just before neuron and connected
         res = self.activation[l - 1][i]
-    # Uncomment for 2x performance gains, not necessary for correctness
     elif k == l - 2:  # Special case for performance, not needed for correctness
         res = (
             self.weight[l - 1][j, q]
@@ -88,8 +87,6 @@ class NeuralNetwork:
 
     # TODO: Understand and try other initializations as xavier and kaiming
     # see https://towardsdatascience.com/weight-initialization-in-neural-networks-a-journey-from-the-basics-to-kaiming-954fb9b47c79
-    # TODO: Decide on a return type, generator or list? in either case, remove
-    # the list() conversions from the code
     def get_random_params(self):
         # CUSTOM initialization heuristic
         # i / n to scale the sum result based on number of input weights
@@ -166,8 +163,6 @@ class NeuralNetwork:
                 for i in range(n + 1):  # +1 for bias neuron
                     gradients[k][i, j] = sum(
                         (self.activation[L][q] - expected[q])
-                        # * self.activation[L][q]
-                        # * (1 - self.activation[L][q])
                         * dadw(self, L, q, k, i, j)
                         for q in range(self.dlayers[-1])
                     )
@@ -186,4 +181,3 @@ class NeuralNetwork:
 
         self.oldgradients = gradients
         del dadw.cache
-        # self.weight -= gradients # TODO: for this to work self.weight should be np.array and not list
