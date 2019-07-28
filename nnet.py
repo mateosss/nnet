@@ -188,13 +188,14 @@ class NeuralNetwork:
     def DADW(self, l, q, k):
         """Matrix of dadw with positions ij representing dadw(l, q, k, i, j)."""
         alq = self.activation[l][q]
-        res = np.zeros((self.dlayers[k] + 1, self.dlayers[k + 1]))
         if k == l - 1:
+            res = np.zeros((self.dlayers[k] + 1, self.dlayers[k + 1]))
             res[:, q] = alq * (1 - alq) * self.activation[k]
         elif k < l - 1:
-            for r in range(self.dlayers[l - 1]):
-                res += self.weight[l - 1][r, q] * self.DADW(l - 1, r, k)
-            res *= alq * (1 - alq)
+            res = alq * (1 - alq) * sum(
+                self.weight[l - 1][r, q] * self.DADW(l - 1, r, k)
+                for r in range(self.dlayers[l - 1])
+            )
         else:
             print("This execution branch should not be reached.")
 
@@ -204,7 +205,7 @@ class NeuralNetwork:
     def get_error_gradient_fast(self, expected):
         L = len(self.dlayers) - 1 # Last layer index
         gradients = np.array([
-            np.zeros((n + 1, m)) for n, m in zip(self.dlayers, self.dlayers[1:])
+            np.empty((n + 1, m)) for n, m in zip(self.dlayers, self.dlayers[1:])
         ])
 
         assert all(
@@ -212,11 +213,10 @@ class NeuralNetwork:
         ), "gradients is not the same shape as weights"
 
         for k in reversed(range(len(self.dlayers) - 1)):
-            for q in range(self.dlayers[-1]):
-                diff = self.activation[L][q] - expected[q]
-                Alqk = self.DADW(L, q, k)
-                # assert np.linalg.norm(self.DADW_slow(L, q, k) - Alqk) == 0
-                gradients[k] += diff * Alqk
+            gradients[k] = sum(
+                (self.activation[L][q] - expected[q]) * self.DADW(L, q, k)
+                for q in range(self.dlayers[-1])
+            )
         return gradients
 
     def backpropagate(self, expected):
