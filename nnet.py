@@ -187,6 +187,14 @@ class NeuralNetwork:
 
     def DADW(self, l, q, k):
         """Matrix of dadw with positions ij representing dadw(l, q, k, i, j)."""
+
+        # Cache setup
+        if not hasattr(self, "_DADW_cache"):
+            self._DADW_cache = {}
+        args = (l, q, k)
+        if args in self._DADW_cache:
+            return self._DADW_cache[args]
+
         alq = self.activation[l][q]
         if k == l - 1:
             res = np.zeros((self.dlayers[k] + 1, self.dlayers[k + 1]))
@@ -199,6 +207,7 @@ class NeuralNetwork:
         else:
             print("This execution branch should not be reached.")
 
+        self._DADW_cache[args] = res
         return res
 
 
