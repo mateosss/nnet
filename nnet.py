@@ -166,12 +166,73 @@ class NeuralNetwork:
                     )
         return gradients
 
+    def DADW_slow(self, l, q, k):
+        """Same as DADW but using the theoretical and slow implementation."""
+        if k == l - 1:
+            res = np.array([
+                [dadw(self, l, q, k, i, j) for j in range(self.dlayers[k + 1])]
+                for i in range(self.dlayers[k] + 1)
+            ])
+        elif k < l - 1:
+            res = np.zeros((self.dlayers[k] + 1, self.dlayers[k + 1]))
+            for r in range(self.dlayers[l - 1]):
+                res += self.weight[l - 1][r, q] * self.DADW_slow(l - 1, r, k)
+            alq = self.activation[l][q]
+            res *= alq * (1 - alq)
+        else:
+            print("This execution branch should not be reached.")
+        return res
+
+    def DADW(self, l, q, k):
+        """Matrix of dadw with positions ij representing dadw(l, q, k, i, j)."""
+
+        # Cache setup
+        if not hasattr(self, "_DADW_cache"):
+            self._DADW_cache = {}
+        args = (l, q, k)
+        if args in self._DADW_cache:
+            return self._DADW_cache[args]
+
+        alq = self.activation[l][q]
+        if k == l - 1:
+            res = np.zeros((self.dlayers[k] + 1, self.dlayers[k + 1]))
+            res[:, q] = alq * (1 - alq) * self.activation[k]
+        elif k < l - 1:
+            res = alq * (1 - alq) * sum(
+                self.weight[l - 1][r, q] * self.DADW(l - 1, r, k)
+                for r in range(self.dlayers[l - 1])
+            )
+        else:
+            print("This execution branch should not be reached.")
+
+        self._DADW_cache[args] = res
+        return res
+
+
+    def get_error_gradient_fast(self, expected):
+        L = len(self.dlayers) - 1 # Last layer index
+        gradients = np.array([
+            np.empty((n + 1, m)) for n, m in zip(self.dlayers, self.dlayers[1:])
+        ])
+
+        assert all(
+            g.shape == w.shape for g, w in zip(gradients, self.weight)
+        ), "gradients is not the same shape as weights"
+
+        for k in reversed(range(len(self.dlayers) - 1)):
+            gradients[k] = sum(
+                (self.activation[L][q] - expected[q]) * self.DADW(L, q, k)
+                for q in range(self.dlayers[-1])
+            )
+        return gradients
+
     def backpropagate(self, gradients=None, expected=None):
         assert gradients is not None or expected is not None
         if gradients is None:
-            gradients = self.get_error_gradient(expected)
-        e = 1
-        a = 0
+            # gradients = self.get_error_gradient(expected)
+            gradients = self.get_error_gradient_fast(expected)
+        e = 0.5
+        a = 0.5
         if hasattr(self, "oldgradients"):
             for w, g, o in zip(self.weight, gradients, self.oldgradients):
                 np.linalg.norm(g)
@@ -182,4 +243,4 @@ class NeuralNetwork:
                 w[...] -= e * g
 
         self.oldgradients = gradients
-        del dadw.cache
+        # del dadw.cache
