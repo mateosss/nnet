@@ -27,27 +27,27 @@ def genetic_main():
 
 def backpropagation_main():
     labels, images = zip(*list(mnist.read()))
-    batch_size = 16
+    batch_size = 2
+    offset = 0
+
     ninputs = [
         [pixel / 255 for row in image for pixel in row]
-        for image in images[:batch_size]
+        for image in images[offset : offset + batch_size]
     ]
     expected_outputs = [
         [1 if i == label else 0 for i in range(10)]
-        for label in labels[:batch_size]
+        for label in labels[offset : offset + batch_size]
     ]
-    print("here")
-
-    # ninput = list(range(2))
-    # nnet = NeuralNetwork([2, 1, 3, 2], params=None)
     nnet = NeuralNetwork(DLAYERS, params=None)
-    # nnet = NeuralNetwork(DLAYERS, params=load_params())
     cost_gradient = [None] * batch_size
     cost = np.empty(batch_size)
-    for j in range(1024):
+    for j in range(1024**10): #
         try:
             for i, (ninput, expected) in enumerate(zip(ninputs, expected_outputs)):
                 guess = nnet.feedforward(ninput)
+                if j % 250 == 0:
+                    print(f"expected={expected}, guess={guess}")
+                    print(f"{nnet.activation[-2]}")
                 cost[i] = nnet.get_error(expected)
                 cost_gradient[i] = nnet.get_error_gradient(expected)
         except KeyboardInterrupt:
@@ -58,10 +58,11 @@ def backpropagation_main():
     # guess = nnet.feedforward(ninput)
     # cost = nnet.get_error(expected)
     # print(f"[{i + 1}] cost = {cost}")
-    save_params(nnet.params)
+    # save_params(nnet.params)
 
 # TODO: Report network confidence and cost, not only hits/misses
 def test_and_report_against(nn, samples, print_every=50):
+    "Reports stats about how the nn network performs against given samples"
     hits = 0
     for i, (label, image) in enumerate(samples):
         ninput = [pixel / 255 for row in image for pixel in row] # Normalized
@@ -81,7 +82,7 @@ def test_and_report_against(nn, samples, print_every=50):
     print(f"\nHits: {hits} | Misses: {misses} -> {100 * hits / len(samples)}%")
 
 def test_trained(params=None, head=100, tail=100):
-    "Tests a network with params against first `head` and last `tail` examples"
+    "Tests a network with params against first `head` and last `tail` samples"
     params = params if params is not None else load_params()
     nnet = NeuralNetwork(DLAYERS, params)
     mnist_db = list(mnist.read())

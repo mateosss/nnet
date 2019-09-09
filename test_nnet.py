@@ -68,10 +68,9 @@ class TestNeuralNetwork(unittest.TestCase):
         unit = lambda v: v / norm(v) if (v != 0).any() else np.zeros(v.shape)
 
         for k in range(len(nnet.weight)):
-            ag = error_gradient[k]
-            ng = numgrad[k]
-            print(f"custom = {norm(unit(ag) - unit(ng))}")
-            print(f"derived from cs231 = {norm(unit(ag) * norm(ng) - ng) / max(norm(ag), norm(ng))}")
+            ag = unit(error_gradient[k])
+            ng = unit(numgrad[k])
+            print(f"cs231 = {norm(ag - ng) / max(norm(ag), norm(ng))}")
             # http://cs231n.github.io/neural-networks-3/#gradcheck
             # CS231 way seems to not work, because it compares only magnitudes
             # and not the direction of the analitical and numerical gradients

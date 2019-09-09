@@ -144,7 +144,7 @@ class NeuralNetwork:
         """Return mean squared error, expected has an output-like structure."""
         return sum((g - e)**2 for g, e in zip(self.activation[-1], expected))
 
-    def get_error_gradient(self, expected):
+    def get_error_gradient_slow(self, expected):
         L = len(self.dlayers) - 1 # Last layer index
         gradients = np.array([
             np.empty((n + 1, m)) for n, m in zip(self.dlayers, self.dlayers[1:])
@@ -209,7 +209,7 @@ class NeuralNetwork:
         return res
 
 
-    def get_error_gradient_fast(self, expected):
+    def get_error_gradient(self, expected):
         L = len(self.dlayers) - 1 # Last layer index
         gradients = np.array([
             np.empty((n + 1, m)) for n, m in zip(self.dlayers, self.dlayers[1:])
@@ -229,17 +229,15 @@ class NeuralNetwork:
     def backpropagate(self, gradients=None, expected=None):
         assert gradients is not None or expected is not None
         if gradients is None:
-            # gradients = self.get_error_gradient(expected)
-            gradients = self.get_error_gradient_fast(expected)
-        e = 0.5
-        a = 0.5
+            # gradients = self.get_error_gradient_slow(expected)
+            gradients = self.get_error_gradient(expected)
+        e = 1e-1
+        a = 0 * e
         if hasattr(self, "oldgradients"):
             for w, g, o in zip(self.weight, gradients, self.oldgradients):
-                np.linalg.norm(g)
                 w[...] -= e * g + a * o
         else:
             for w, g in zip(self.weight, gradients):
-                np.linalg.norm(g)
                 w[...] -= e * g
 
         self.oldgradients = gradients
