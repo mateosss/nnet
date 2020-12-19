@@ -60,10 +60,10 @@ def dadw(self, l, q, k, i, j):
 
 
 class NeuralNetwork:
+    # n and m will refer to the size of current and next layer in comments
     dlayers: List[int] # Layer description
     weight: List # List of (n + 1) * m matrices (+1 for bias)
     activation: List # List of n length vectors
-    run: bool # Has the network been run with the current weights?
 
     def __init__(self, dlayers: List[int], params: List[int] = None):
         """
@@ -71,17 +71,12 @@ class NeuralNetwork:
         params: Parameters to create_layers, if None, then randoms will be used
         """
         self.dlayers = dlayers
-        self.run = False
         self.activation = np.array([
             np.concatenate((np.zeros(n), [1])) for n in dlayers
         ])
         # Set weights
         params = params if params is not None else self.get_random_params()
         self.create_layers(params)
-
-    def __call__(self, params, ilayer):
-        self.create_layers(params)
-        return self.feedforward(ilayer)
 
     # TODO: Understand and try other initializations as xavier and kaiming
     # see https://towardsdatascience.com/weight-initialization-in-neural-networks-a-journey-from-the-basics-to-kaiming-954fb9b47c79
@@ -91,7 +86,7 @@ class NeuralNetwork:
         # seems to make outputs stable
         # TODO: Should biases be initialized differently?
         return np.array([
-            i / (n + 1) for n, m in zip(self.dlayers, self.dlayers[1:])
+            i / np.sqrt(n + 1) for n, m in zip(self.dlayers, self.dlayers[1:])
             for i in randn((n + 1) * m)
         ])
 
@@ -107,7 +102,6 @@ class NeuralNetwork:
             w_LL_n1_m1, ..., w_LL_nN,mM
         ]
         """
-        self.run = False
         l = len(self.dlayers)
         self.weight = [None] * (l - 1)
         wsizes = [(n + 1) * m for n, m in zip(self.dlayers, self.dlayers[1:])]
@@ -231,11 +225,11 @@ class NeuralNetwork:
         if gradients is None:
             # gradients = self.get_error_gradient_slow(expected)
             gradients = self.get_error_gradient(expected)
-        e = 1e-1
-        a = 0 * e
+        e = 1e-1 # learning rate
+        a = 0 * e # momentum
         if hasattr(self, "oldgradients"):
             for w, g, o in zip(self.weight, gradients, self.oldgradients):
-                w[...] -= e * g + a * o
+                w[...] -= e * g * (1 - a) + a * o
         else:
             for w, g in zip(self.weight, gradients):
                 w[...] -= e * g
