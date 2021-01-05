@@ -1,69 +1,17 @@
-from typing import List
+from typing import Dict, List
+
 import numpy as np
 from numpy.random import randn
 
 np.random.seed(1)
-
-def star(self, l, r, k, i, j):
-    Alr = self.activation[l][r]
-    return Alr * (1 - Alr) * dadw(self, l, r, k, i, j)
-
-# HACK: for memoizing just one instance
-# TODO: put inside class and keep the memoization
-def dadw(self, l, q, k, i, j):
-    """Derivative of activation q of layer l (Alq) with respect to weight from
-    neuron i in layer k to neuron j in layer k + 1 (Wkij)
-    """
-    # Memoization stuff
-    if not hasattr(dadw, "cache"):
-        dadw.cache = {}
-    args = (l, q, k, i, j)
-    if args in dadw.cache:
-        return dadw.cache[args]
-
-    # Conditional factor
-    if l < 0 or q < 0 or k < 0 or i < 0 or j < 0:  # Out of range indexes
-        print(f"Negative parameter found: l, q, k, i, j={l, q, k, i, j}")
-        res = 0
-    elif l == 0:  # No weight affects an input neuron
-        res = 0
-    elif k >= l:  # Weight to the right of neuron
-        print(f"k={k} >= l={l}, it should not happen")
-        res = 0
-    elif q == self.dlayers[l]:  # is bias neuron, nothing changes its value
-        print(f"Executing on a bias neuron, it should not happen, l={l}, q={q}")
-        res = 0
-    elif k == l - 1 and j != q:  # Weight just before neuron but disconnected
-        res = 0
-    elif k == l - 1 and j == q:  # Weight just before neuron and connected
-        res = self.activation[l - 1][i]
-    elif k == l - 2:  # Special case for performance, not needed for correctness
-        res = (
-            self.weight[l - 1][j, q]
-            * self.activation[l - 1][j] * (1 - self.activation[l - 1][j])
-            * self.activation[l - 2][i]
-        )
-    elif k < l - 1:
-        res = sum(
-            self.weight[l - 1][r, q] * dadw(self, l - 1, r, k, i, j)
-            for r in range(self.dlayers[l - 1])
-        )
-    else:
-        print("Should never reach this execution branch")
-
-    # Derivative of activation function factor
-    res *= self.activation[l][q] * (1 - self.activation[l][q]) # g'(in^l_q)
-
-    # Cache it
-    dadw.cache[args] = res
-    return res
-
 
 class NeuralNetwork:
     # n and m will refer to the size of current and next layer in comments
     dlayers: List[int] # Layer description
     weight: List # List of (n + 1) * m matrices (+1 for bias)
     activation: List # List of n length vectors
+
+    _dadw_cache: Dict
 
     def __init__(self, dlayers: List[int], params: List[int] = None):
         """
@@ -77,6 +25,8 @@ class NeuralNetwork:
         # Set weights
         params = params if params is not None else self.get_random_params()
         self.create_layers(params)
+
+        self._dadw_cache = {}
 
     # TODO: Understand and try other initializations as xavier and kaiming
     # see https://towardsdatascience.com/weight-initialization-in-neural-networks-a-journey-from-the-basics-to-kaiming-954fb9b47c79
@@ -138,6 +88,49 @@ class NeuralNetwork:
         """Return mean squared error, expected has an output-like structure."""
         return sum((g - e)**2 for g, e in zip(self.activation[-1], expected))
 
+    def dadw(self, l, q, k, i, j) -> float:
+        """Return derivative of a^l_q with respect to w^k_ij."""
+        # Memoization stuff
+        args = (l, q, k, i, j)
+        if args in self._dadw_cache:
+            return self._dadw_cache[args]
+
+        # Conditional factor of the multiplication
+        if l < 0 or q < 0 or k < 0 or i < 0 or j < 0:  # Out of range indexes
+            raise Exception(f"Negative parameter found: l, q, k, i, j={l, q, k, i, j}")
+        elif l == 0:  # No weight affects an input neuron
+            res = 0
+        elif k >= l:  # Weight to the right of neuron
+            res = 0
+            raise Exception(f"{k=} >= {l=}, it should not happen")
+        elif q == self.dlayers[l]:  # is bias neuron, nothing changes its value
+            res = 0
+        elif k == l - 1 and j != q:  # Weight just before neuron but disconnected
+            res = 0
+        elif k == l - 1 and j == q:  # Weight just before neuron and connected
+            res = self.activation[k][i]
+        # elif k == l - 2:  # Special case for performance, not needed for correctness
+        #     res = ( # TODO: Uses sigmoid derivative, generalize.
+        #         self.weight[l - 1][j, q]
+        #         * self.activation[l - 1][j] * (1 - self.activation[l - 1][j])
+        #         * self.activation[l - 2][i]
+        #     )
+        elif k < l - 1:
+            res = sum(
+                self.weight[l - 1][r, q] * self.dadw(l - 1, r, k, i, j)
+                for r in range(self.activation[l - 1].size)
+            )
+        else:
+            raise Exception("Should never reach this execution branch")
+
+        # Multiply by derivative of activation function
+        # TODO: Uses sigmoid derivative, generalize.
+        res *= self.activation[l][q] * (1 - self.activation[l][q]) # g'(in^l_q)
+
+        # Cache it
+        self._dadw_cache[args] = res
+        return res
+
     def get_error_gradient_slow(self, expected):
         L = len(self.dlayers) - 1 # Last layer index
         gradients = np.array([
@@ -155,7 +148,7 @@ class NeuralNetwork:
                 for i in range(n + 1):  # +1 for bias neuron
                     gradients[k][i, j] = sum(
                         (self.activation[L][q] - expected[q])
-                        * dadw(self, L, q, k, i, j)
+                        * self.dadw(L, q, k, i, j)
                         for q in range(self.dlayers[-1])
                     )
         return gradients
@@ -164,7 +157,7 @@ class NeuralNetwork:
         """Same as DADW but using the theoretical and slow implementation."""
         if k == l - 1:
             res = np.array([
-                [dadw(self, l, q, k, i, j) for j in range(self.dlayers[k + 1])]
+                [self.dadw(l, q, k, i, j) for j in range(self.dlayers[k + 1])]
                 for i in range(self.dlayers[k] + 1)
             ])
         elif k < l - 1:
@@ -201,7 +194,6 @@ class NeuralNetwork:
 
         self._DADW_cache[args] = res
         return res
-
 
     def get_error_gradient(self, expected):
         L = len(self.dlayers) - 1 # Last layer index
