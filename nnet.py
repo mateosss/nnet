@@ -20,9 +20,8 @@ class NeuralNetwork:
         params: Parameters to create_layers, if None, then randoms will be used
         """
         self.dlayers = dlayers
-        self.activation = np.array(
-            [np.concatenate((np.zeros(n), [1])) for n in dlayers]
-        )
+        self.activation = [np.concatenate((np.zeros(n), [1])) for n in dlayers]
+
         # Set weights
         params = params if params is not None else self.get_random_params()
         self.create_layers(params)
@@ -92,7 +91,10 @@ class NeuralNetwork:
 
     def get_error(self, expected: List[float]):
         """Return mean squared error, expected has an output-like structure."""
-        return sum((g - e) ** 2 for g, e in zip(self.activation[-1], expected))
+        return (
+            sum((o - e) ** 2 for o, e in zip(self.activation[-1], expected))
+            / self.dlayers[-1]
+        )
 
     def dadw(self, l, q, k, i, j) -> float:
         """Return derivative of a^l_q with respect to w^k_ij."""
@@ -101,15 +103,18 @@ class NeuralNetwork:
         if args in self._dadw_cache:
             return self._dadw_cache[args]
 
+        # Range assertions
+        assert l >= 0 and l < len(self.dlayers), f"out of range {l=}"
+        assert k >= 0 and k < len(self.dlayers), f"out of range {k=}"
+        assert i >= 0 and i < self.activation[k].size, f"out of range {i=}"
+        assert j >= 0 and j < self.dlayers[k], f"out of range {j=}"
+
+        # Usage assertions, while dadw is theoretically defined as 0 for these, we don't to call them.
+        assert k < l, f"requesting dadw with weight right to the neuron {k=} >= {l=}"
+        assert q != self.dlayers[l], f"requesting dadw of bias neuron a^{l=}_{q=}"
+
         # Conditional factor of the multiplication
-        if l < 0 or q < 0 or k < 0 or i < 0 or j < 0:  # Out of range indexes
-            raise Exception(f"Negative parameter found: l, q, k, i, j={l, q, k, i, j}")
-        elif l == 0:  # No weight affects an input neuron
-            res = 0
-        elif k >= l:  # Weight to the right of neuron
-            res = 0
-            raise Exception(f"{k=} >= {l=}, it should not happen")
-        elif q == self.dlayers[l]:  # is bias neuron, nothing changes its value
+        if l == 0:  # No weight affects an input neuron
             res = 0
         elif k == l - 1 and j != q:  # Weight just before neuron but disconnected
             res = 0
@@ -124,7 +129,7 @@ class NeuralNetwork:
         elif k < l - 1:
             res = sum(
                 self.weight[l - 1][r, q] * self.dadw(l - 1, r, k, i, j)
-                for r in range(self.activation[l - 1].size)
+                for r in range(self.dlayers[l - 1])
             )
         else:
             raise Exception("Should never reach this execution branch")
