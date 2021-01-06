@@ -5,11 +5,12 @@ from numpy.random import randn
 
 np.random.seed(1)
 
+
 class NeuralNetwork:
     # n and m will refer to the size of current and next layer in comments
-    dlayers: List[int] # Layer description
-    weight: List # List of (n + 1) * m matrices (+1 for bias)
-    activation: List # List of n length vectors
+    dlayers: List[int]  # Layer description
+    weight: List  # List of (n + 1) * m matrices (+1 for bias)
+    activation: List  # List of n length vectors
 
     _dadw_cache: Dict
 
@@ -19,9 +20,9 @@ class NeuralNetwork:
         params: Parameters to create_layers, if None, then randoms will be used
         """
         self.dlayers = dlayers
-        self.activation = np.array([
-            np.concatenate((np.zeros(n), [1])) for n in dlayers
-        ])
+        self.activation = np.array(
+            [np.concatenate((np.zeros(n), [1])) for n in dlayers]
+        )
         # Set weights
         params = params if params is not None else self.get_random_params()
         self.create_layers(params)
@@ -35,10 +36,13 @@ class NeuralNetwork:
         # i / n to scale the sum result based on number of input weights
         # seems to make outputs stable
         # TODO: Should biases be initialized differently?
-        return np.array([
-            i / np.sqrt(n + 1) for n, m in zip(self.dlayers, self.dlayers[1:])
-            for i in randn((n + 1) * m)
-        ])
+        return np.array(
+            [
+                i / np.sqrt(n + 1)
+                for n, m in zip(self.dlayers, self.dlayers[1:])
+                for i in randn((n + 1) * m)
+            ]
+        )
 
     def create_layers(self, params):
         """
@@ -57,10 +61,10 @@ class NeuralNetwork:
         wsizes = [(n + 1) * m for n, m in zip(self.dlayers, self.dlayers[1:])]
         offset_layer = np.concatenate([[0], np.cumsum(wsizes)])
         for k in range(l - 1):
-            n = self.dlayers[k] + 1 # Neurons in current layer
-            m = self.dlayers[k + 1] # Neurons in next layer
-            self.weight[k] = (
-                params[offset_layer[k]:offset_layer[k + 1]].reshape((n, m))
+            n = self.dlayers[k] + 1  # Neurons in current layer
+            m = self.dlayers[k + 1]  # Neurons in next layer
+            self.weight[k] = params[offset_layer[k] : offset_layer[k + 1]].reshape(
+                (n, m)
             )
 
     def feedforward(self, ilayer):
@@ -73,10 +77,12 @@ class NeuralNetwork:
         sigmoid = lambda x: 1 / (1 + np.exp(-x))
         self.activation[0] = np.concatenate((ilayer, [1]))
         for layer in range(1, len(self.dlayers)):
-            self.activation[layer] = np.concatenate((
-                sigmoid(self.activation[layer - 1] @ self.weight[layer - 1]),
-                [1],
-            ))
+            self.activation[layer] = np.concatenate(
+                (
+                    sigmoid(self.activation[layer - 1] @ self.weight[layer - 1]),
+                    [1],
+                )
+            )
         return self.activation[-1][:-1]  # Remove bias neuron from result
 
     @property
@@ -86,7 +92,7 @@ class NeuralNetwork:
 
     def get_error(self, expected: List[float]):
         """Return mean squared error, expected has an output-like structure."""
-        return sum((g - e)**2 for g, e in zip(self.activation[-1], expected))
+        return sum((g - e) ** 2 for g, e in zip(self.activation[-1], expected))
 
     def dadw(self, l, q, k, i, j) -> float:
         """Return derivative of a^l_q with respect to w^k_ij."""
@@ -125,17 +131,17 @@ class NeuralNetwork:
 
         # Multiply by derivative of activation function
         # TODO: Uses sigmoid derivative, generalize.
-        res *= self.activation[l][q] * (1 - self.activation[l][q]) # g'(in^l_q)
+        res *= self.activation[l][q] * (1 - self.activation[l][q])  # g'(in^l_q)
 
         # Cache it
         self._dadw_cache[args] = res
         return res
 
     def get_error_gradient_slow(self, expected):
-        L = len(self.dlayers) - 1 # Last layer index
-        gradients = np.array([
-            np.empty((n + 1, m)) for n, m in zip(self.dlayers, self.dlayers[1:])
-        ])
+        L = len(self.dlayers) - 1  # Last layer index
+        gradients = np.array(
+            [np.empty((n + 1, m)) for n, m in zip(self.dlayers, self.dlayers[1:])]
+        )
 
         assert all(
             g.shape == w.shape for g, w in zip(gradients, self.weight)
@@ -147,8 +153,7 @@ class NeuralNetwork:
             for j in range(m):
                 for i in range(n + 1):  # +1 for bias neuron
                     gradients[k][i, j] = sum(
-                        (self.activation[L][q] - expected[q])
-                        * self.dadw(L, q, k, i, j)
+                        (self.activation[L][q] - expected[q]) * self.dadw(L, q, k, i, j)
                         for q in range(self.dlayers[-1])
                     )
         return gradients
@@ -156,10 +161,12 @@ class NeuralNetwork:
     def DADW_slow(self, l, q, k):
         """Same as DADW but using the theoretical and slow implementation."""
         if k == l - 1:
-            res = np.array([
-                [self.dadw(l, q, k, i, j) for j in range(self.dlayers[k + 1])]
-                for i in range(self.dlayers[k] + 1)
-            ])
+            res = np.array(
+                [
+                    [self.dadw(l, q, k, i, j) for j in range(self.dlayers[k + 1])]
+                    for i in range(self.dlayers[k] + 1)
+                ]
+            )
         elif k < l - 1:
             res = np.zeros((self.dlayers[k] + 1, self.dlayers[k + 1]))
             for r in range(self.dlayers[l - 1]):
@@ -185,9 +192,13 @@ class NeuralNetwork:
             res = np.zeros((self.dlayers[k] + 1, self.dlayers[k + 1]))
             res[:, q] = alq * (1 - alq) * self.activation[k]
         elif k < l - 1:
-            res = alq * (1 - alq) * sum(
-                self.weight[l - 1][r, q] * self.DADW(l - 1, r, k)
-                for r in range(self.dlayers[l - 1])
+            res = (
+                alq
+                * (1 - alq)
+                * sum(
+                    self.weight[l - 1][r, q] * self.DADW(l - 1, r, k)
+                    for r in range(self.dlayers[l - 1])
+                )
             )
         else:
             print("This execution branch should not be reached.")
@@ -196,10 +207,10 @@ class NeuralNetwork:
         return res
 
     def get_error_gradient(self, expected):
-        L = len(self.dlayers) - 1 # Last layer index
-        gradients = np.array([
-            np.empty((n + 1, m)) for n, m in zip(self.dlayers, self.dlayers[1:])
-        ])
+        L = len(self.dlayers) - 1  # Last layer index
+        gradients = np.array(
+            [np.empty((n + 1, m)) for n, m in zip(self.dlayers, self.dlayers[1:])]
+        )
 
         assert all(
             g.shape == w.shape for g, w in zip(gradients, self.weight)
@@ -217,8 +228,8 @@ class NeuralNetwork:
         if gradients is None:
             # gradients = self.get_error_gradient_slow(expected)
             gradients = self.get_error_gradient(expected)
-        e = 1e-1 # learning rate
-        a = 0 * e # momentum
+        e = 1e-1  # learning rate
+        a = 0 * e  # momentum
         if hasattr(self, "oldgradients"):
             for w, g, o in zip(self.weight, gradients, self.oldgradients):
                 w[...] -= e * g * (1 - a) + a * o

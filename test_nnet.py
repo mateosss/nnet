@@ -1,12 +1,16 @@
 import unittest
+
 import numpy as np
 from numpy.linalg import norm
+
 import mnist
 from nnet import NeuralNetwork
+
 # TODO: Comment intent of each individual assertion
 
 np.random.seed(1)  # TODO: Remove?
-GM = 10 # Gaussian bell curve maximum
+GM = 10  # Gaussian bell curve maximum
+
 
 class TestNeuralNetwork(unittest.TestCase):
     "NeuralNetwork unit tests"
@@ -16,7 +20,7 @@ class TestNeuralNetwork(unittest.TestCase):
         nnet = NeuralNetwork(dlayers)
         params = nnet.get_random_params()
 
-        weights = [n *  m for n, m in zip(dlayers, dlayers[1:])]
+        weights = [n * m for n, m in zip(dlayers, dlayers[1:])]
         biases = dlayers[1:]
         self.assertEqual(len(params), sum(weights) + sum(biases))
         self.assertTrue(all(-GM <= p <= GM for p in params))
@@ -27,20 +31,18 @@ class TestNeuralNetwork(unittest.TestCase):
         params = nnet.get_random_params()
         nnet.create_layers(params)
 
-        weights = [(n + 1) *  m for n, m in zip(dlayers, dlayers[1:])]
+        weights = [(n + 1) * m for n, m in zip(dlayers, dlayers[1:])]
 
         # Weights assertions
         self.assertEqual(len(nnet.weight), len(dlayers) - 1)
+        self.assertTrue(all(w.size == weights[i] for i, w in enumerate(nnet.weight)))
         self.assertTrue(
-            all(w.size == weights[i] for i, w in enumerate(nnet.weight))
+            all(
+                w.shape == (dlayers[i - 1] + 1, dlayers[i])
+                for i, w in enumerate(nnet.weight, 1)
+            )
         )
-        self.assertTrue(all(
-            w.shape == (dlayers[i - 1] + 1, dlayers[i])
-            for i, w in enumerate(nnet.weight, 1)
-        ))
-        self.assertTrue(all(
-            -GM <= p <= GM for w in nnet.weight for p in np.nditer(w)
-        ))
+        self.assertTrue(all(-GM <= p <= GM for w in nnet.weight for p in np.nditer(w)))
 
         # TODO: Check that all bias activations are 1
 
@@ -86,5 +88,5 @@ class TestNeuralNetwork(unittest.TestCase):
         pass
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
