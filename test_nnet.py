@@ -13,7 +13,7 @@ from nnet import NeuralNetwork
 
 np.random.seed(1)  # TODO: Remove?
 GM = 10  # Gaussian bell curve maximum
-COMPLETENESS = 1  # ratio of loops that will be effectively tested
+COMPLETENESS = 0.05  # ratio of loops that will be effectively tested
 
 
 @dataclass

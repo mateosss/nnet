@@ -5,6 +5,11 @@ from numpy.random import randn
 
 np.random.seed(1)
 
+# TODO: Try more activation functions as ReLU and others
+# TODO: Move activation function inside class
+g = lambda x: 1 / (1 + np.exp(-x))  # Activation function
+gprime = lambda h: g(h) * (1 - g(h))  # g'(in^l_q)
+
 
 class NeuralNetwork:
     # n and m will refer to the size of current and next layer in comments
@@ -20,6 +25,7 @@ class NeuralNetwork:
         params: Parameters to create_layers, if None, then randoms will be used
         """
         self.dlayers = dlayers
+        self.fanin = [np.zeros(n) for n in [0] + dlayers[1:]]  # weighted sum for neuron
         self.activation = [np.concatenate((np.zeros(n), [1])) for n in dlayers]
 
         # Set weights
@@ -43,17 +49,16 @@ class NeuralNetwork:
             ]
         )
 
-    def create_layers(self, params):
-        """
-        Maps the flat params iterable to a proper weight matrix
+    @property
+    def params(self):
+        """Return parameter list that can be used to recreate this network."""
+        return np.array([w for m in self.weight for r in m for w in r])
 
-        params: Flat list of weights, will be modified
-        params: [
-            Weights                     | Biases
-            w_L1_n1_m1, ..., w_L1_nN_mM, w_L1_nB_m1, ..., w_L1_nB_mM,
-                        ...
-            w_LL_n1_m1, ..., w_LL_nN,mM
-        ]
+    def create_layers(self, params):
+        """Map the flat params iterable to a proper weight matrix.
+
+        params: Flat list of weights w^k_{i, j} from neuron i in layer k to j in k + 1
+        to understand the param format see NeuralNetwork.params property
         """
         l = len(self.dlayers)
         self.weight = [None] * (l - 1)
@@ -67,35 +72,22 @@ class NeuralNetwork:
             )
 
     def feedforward(self, ilayer):
-        """
-        Forward propagation of the network, fill activation vectors
+        """Forward propagation of the network, fill activation vectors.
+
         ilayer: Normalized input layer scaled in range [0, 1]
         returns: last layer activations (the guess)
         """
         self._dadw_cache = {}  # Previous cache invalid for this feedforward
-        # TODO: Try more activation functions as ReLU and others
-        sigmoid = lambda x: 1 / (1 + np.exp(-x))
-        self.activation[0] = np.concatenate((ilayer, [1]))
-        for layer in range(1, len(self.dlayers)):
-            self.activation[layer] = np.concatenate(
-                (
-                    sigmoid(self.activation[layer - 1] @ self.weight[layer - 1]),
-                    [1],
-                )
-            )
-        return self.activation[-1][:-1]  # Remove bias neuron from result
 
-    @property
-    def params(self):
-        """Return parameter list that can be used to recreate this network."""
-        return np.array([w for m in self.weight for r in m for w in r])
+        self.activation[0][:-1] = ilayer
+        for k in range(1, len(self.dlayers)):
+            self.fanin[k] = self.activation[k - 1] @ self.weight[k - 1]
+            self.activation[k][:-1] = g(self.fanin[k])
+        return self.activation[-1][:-1].copy()  # Remove bias neuron from result
 
-    def get_error(self, expected: List[float]):
-        """Return mean squared error, expected has an output-like structure."""
-        return (
-            sum((o - e) ** 2 for o, e in zip(self.activation[-1], expected))
-            / self.dlayers[-1]
-        )
+    def get_error(self, expd: List[float]):
+        """Return mean squared error, expected expd has an output-like structure."""
+        return sum((o - e) ** 2 for o, e in zip(self.activation[-1], expd)) / len(expd)
 
     def dadw(self, l, q, k, i, j) -> float:
         """Return derivative of a^l_q with respect to w^k_ij."""
@@ -110,7 +102,8 @@ class NeuralNetwork:
         assert i >= 0 and i < self.activation[k].size, f"out of range {i=}"
         assert j >= 0 and j < self.dlayers[k], f"out of range {j=}"
 
-        # Usage assertions, while dadw is theoretically defined as 0 for these, we don't to call them.
+        # Usage assertions
+        # while dadw is theoretically defined as 0 for these, we don't want them to run
         assert k < l, f"requesting dadw with weight right to the neuron {k=} >= {l=}"
         assert q != self.dlayers[l], f"requesting dadw of bias neuron a^{l=}_{q=}"
 
@@ -121,12 +114,12 @@ class NeuralNetwork:
             res = 0
         elif k == l - 1 and j == q:  # Weight just before neuron and connected
             res = self.activation[k][i]
-        # elif k == l - 2:  # Special case for performance, not needed for correctness
-        #     res = ( # TODO: Uses sigmoid derivative, generalize.
-        #         self.weight[l - 1][j, q]
-        #         * self.activation[l - 1][j] * (1 - self.activation[l - 1][j])
-        #         * self.activation[l - 2][i]
-        #     )
+        elif k == l - 2:  # Special case for performance, not needed for correctness
+            res = (
+                self.weight[l - 1][j, q]
+                * gprime(self.fanin[l - 1][j])
+                * self.activation[k][i]
+            )
         elif k < l - 1:
             res = sum(
                 self.weight[l - 1][r, q] * self.dadw(l - 1, r, k, i, j)
@@ -135,9 +128,8 @@ class NeuralNetwork:
         else:
             raise Exception("Should never reach this execution branch")
 
-        # Multiply by derivative of activation function
-        # TODO: Uses sigmoid derivative, generalize.
-        res *= self.activation[l][q] * (1 - self.activation[l][q])  # g'(in^l_q)
+        # Multiply by derivative of activation function over the neuron's weighted sum
+        res *= gprime(self.fanin[l][q])
 
         # Cache it
         self._dadw_cache[args] = res
@@ -191,11 +183,13 @@ class NeuralNetwork:
             self._DADW_cache = {}
         args = (l, q, k)
         if args in self._DADW_cache:
+            # TODO: Careful here, I'm returning a reference and not a copy of this matrix
             return self._DADW_cache[args]
 
         alq = self.activation[l][q]
         if k == l - 1:
             res = np.zeros((self.dlayers[k] + 1, self.dlayers[k + 1]))
+            # TODO: sigmoid specific, generalize.
             res[:, q] = alq * (1 - alq) * self.activation[k]
         elif k < l - 1:
             res = (
@@ -214,9 +208,9 @@ class NeuralNetwork:
 
     def get_error_gradient(self, expected):
         L = len(self.dlayers) - 1  # Last layer index
-        gradients = np.array(
-            [np.empty((n + 1, m)) for n, m in zip(self.dlayers, self.dlayers[1:])]
-        )
+        gradients = [
+            np.empty((n + 1, m)) for n, m in zip(self.dlayers, self.dlayers[1:])
+        ]
 
         assert all(
             g.shape == w.shape for g, w in zip(gradients, self.weight)
