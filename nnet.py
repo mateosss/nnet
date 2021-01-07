@@ -30,7 +30,7 @@ class NeuralNetwork:
 
         # Set weights
         params = params if params is not None else self.get_random_params()
-        self.create_layers(params)
+        self.weight = self.weights_from_params(params)
 
         self._dadw_cache = {}
 
@@ -54,22 +54,21 @@ class NeuralNetwork:
         """Return parameter list that can be used to recreate this network."""
         return np.array([w for m in self.weight for r in m for w in r])
 
-    def create_layers(self, params):
+    def weights_from_params(self, params) -> List[np.array]:
         """Map the flat params iterable to a proper weight matrix.
 
         params: Flat list of weights w^k_{i, j} from neuron i in layer k to j in k + 1
         to understand the param format see NeuralNetwork.params property
         """
-        l = len(self.dlayers)
-        self.weight = [None] * (l - 1)
+        l = len(self.dlayers) - 1  # amount of weight matrices
+        weights = [None] * l
         wsizes = [(n + 1) * m for n, m in zip(self.dlayers, self.dlayers[1:])]
         offset_layer = np.concatenate([[0], np.cumsum(wsizes)])
-        for k in range(l - 1):
+        for k in range(l):
             n = self.dlayers[k] + 1  # Neurons in current layer
             m = self.dlayers[k + 1]  # Neurons in next layer
-            self.weight[k] = params[offset_layer[k] : offset_layer[k + 1]].reshape(
-                (n, m)
-            )
+            weights[k] = params[offset_layer[k] : offset_layer[k + 1]].reshape((n, m))
+        return weights
 
     def feedforward(self, ilayer):
         """Forward propagation of the network, fill activation vectors.

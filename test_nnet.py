@@ -12,7 +12,7 @@ from nnet import NeuralNetwork
 # TODO: Comment intent of each individual assertion
 
 np.random.seed(1)  # TODO: Remove?
-GM = 10  # Gaussian bell curve maximum
+WTOL = 10  # weights must be within [-WTOL, +WTOL]
 COMPLETENESS = 0.05  # ratio of loops that will be effectively tested
 
 
@@ -53,25 +53,24 @@ def test_get_random_params():
     weights = [n * m for n, m in zip(dlayers, dlayers[1:])]
     biases = dlayers[1:]
     assert len(params) == sum(weights) + sum(biases)
-    assert all(-GM <= p <= GM for p in params)
+    assert all(-WTOL <= p <= WTOL for p in params)
 
 
-def test_create_layers():
+def test_params_conversion():
     dlayers = [1024, 32, 64, 47]
     nnet = NeuralNetwork(dlayers)
     params = nnet.get_random_params()
-    nnet.create_layers(params)
+    weights = nnet.weights_from_params(params)
 
-    weights = [(n + 1) * m for n, m in zip(dlayers, dlayers[1:])]
+    wsizes = [(n + 1) * m for n, m in zip(dlayers, dlayers[1:])]
 
     # Weights assertions
-    len(nnet.weight) == len(dlayers) - 1
-    assert all(w.size == weights[i] for i, w in enumerate(nnet.weight))
+    assert len(weights) == len(dlayers) - 1
+    assert all(w.size == wsize for w, wsize in zip(weights, wsizes))
     assert all(
-        w.shape == (dlayers[i - 1] + 1, dlayers[i])
-        for i, w in enumerate(nnet.weight, 1)
+        w.shape == (dlayers[i - 1] + 1, dlayers[i]) for i, w in enumerate(weights, 1)
     )
-    assert all(-GM <= p <= GM for w in nnet.weight for p in np.nditer(w))
+    assert all(-WTOL <= p <= WTOL for w in weights for p in np.nditer(w))
     assert all(a[-1] == 1 for a in nnet.activation)
 
 
