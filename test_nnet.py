@@ -13,7 +13,7 @@ from nnet import NeuralNetwork
 
 np.random.seed(1)  # TODO: Remove?
 GM = 10  # Gaussian bell curve maximum
-COMPLETENESS = 0.05  # 1 is full coverage, <1 will allow tests to skip cases to be quicker
+COMPLETENESS = 1  # ratio of loops that will be effectively tested
 
 
 @dataclass
@@ -33,7 +33,10 @@ class Loop:
         self._count += 1
         self._cover_progress += self.cover_ratio
         if self._count % self.log_every == 0:
-            print(f"{self.log_text.format(self._count, self.total_loops)}{' ' * 16}\r", end="")
+            print(
+                f"{self.log_text.format(self._count, self.total_loops)}{' ' * 16}\r",
+                end="",
+            )
         if self._count == self.total_loops:
             print(f"{' ' * 79}\r", end="")
         if self._cover_progress >= 1:
@@ -95,6 +98,8 @@ def test_numerical_vs_analytical_dadw(completeness=COMPLETENESS):
             wmatrix[i, j] = w + epsilon
             b_out = net.feedforward(ninput)
             ndadw = (b_out - a_out) / (2 * epsilon)
+            wmatrix[i, j] = w
+            net.feedforward(ninput)  # Refreshes net fanin and activation
             adadw = np.array([net.dadw(L, q, k, i, j) for q in range(dlayers[-1])])
             # greatest relative difference
             diff = max(abs(ndadw - adadw)) / (
@@ -103,7 +108,7 @@ def test_numerical_vs_analytical_dadw(completeness=COMPLETENESS):
             if diff > maxreldiff:
                 maxreldiff = diff
                 assert maxreldiff < 0.01, f"{maxreldiff=} should be less than 1%"
-    print(f"maxreldiff={maxreldiff * 100:.3f}% between numeric and analytical dadw")
+    print(f"maxreldiff={maxreldiff * 100:.5f}% between numeric and analytical dadw")
 
 
 def test_numerical_gradient_checking(completeness=COMPLETENESS):

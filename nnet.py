@@ -72,6 +72,7 @@ class NeuralNetwork:
         ilayer: Normalized input layer scaled in range [0, 1]
         returns: last layer activations (the guess)
         """
+        self._dadw_cache = {}  # Previous cache invalid for this feedforward
         # TODO: Try more activation functions as ReLU and others
         sigmoid = lambda x: 1 / (1 + np.exp(-x))
         self.activation[0] = np.concatenate((ilayer, [1]))
