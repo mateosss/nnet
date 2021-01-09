@@ -1,8 +1,11 @@
 """NeuralNetwork unit tests"""
 
 from dataclasses import dataclass
+from os import truncate
+from sys import dont_write_bytecode
 
 import numpy as np
+from numpy.lib.function_base import gradient
 from numpy.linalg import norm
 
 import mnist
@@ -120,15 +123,24 @@ def test_dadw(completeness=COMPLETENESS):
     )
 
 
-def test_get_gradients_slow():
-    """Make one big update with the error gradient and assert it is almost perfect."""
+def test_get_gradients():
+    """Check for equality and functioning of various gradient methods.
+
+    Check if all the different gradient methods return the same matrix.
+    Make one big update with the error gradient and assert it is almost perfect.
+    """
     nnet = NeuralNetwork([784, 16, 16, 10])
 
     old_out = nnet.feedforward(INPUT)
     old_error = nnet.get_error(TARGET)
-    gradients = nnet.get_gradients_slow(TARGET)
+    grads_dadw = nnet.get_gradients_slow(TARGET)
+    grads_DADWs = nnet.get_gradients(TARGET, slow=True)
 
-    for wm, gm in zip(nnet.weights, gradients):
+    assert all(
+        np.allclose(s, sm, rtol=0, atol=1e-17) for s, sm in zip(grads_dadw, grads_DADWs)
+    )
+
+    for wm, gm in zip(nnet.weights, grads_dadw):
         wm[...] -= gm * 1000
 
     new_out = nnet.feedforward(INPUT)
