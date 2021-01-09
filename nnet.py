@@ -84,9 +84,9 @@ class NeuralNetwork:
             self.activation[k][:-1] = g(self.fanin[k])
         return self.activation[-1][:-1].copy()  # Remove bias neuron from result
 
-    def get_error(self, expd: List[float]):
-        """Return mean squared error, expected expd has an output-like structure."""
-        return sum((o - e) ** 2 for o, e in zip(self.activation[-1], expd)) / len(expd)
+    def get_error(self, tgt: List[float]):
+        """Return mean squared error, target tgt has an output-like structure."""
+        return sum((o - e) ** 2 for o, e in zip(self.activation[-1], tgt)) / len(tgt)
 
     def dadw(self, l, q, k, i, j) -> float:
         """Return derivative of a^l_q with respect to w^k_ij."""
@@ -134,23 +134,18 @@ class NeuralNetwork:
         self._dadw_cache[args] = res
         return res
 
-    def get_error_gradient_slow(self, expected):
+    def get_gradients_slow(self, target) -> List[np.array]:
+        """Matrix of each error gradient ∇E^k_{i, j} using dadw()."""
         L = len(self.dlayers) - 1  # Last layer index
-        gradients = np.array(
-            [np.empty((n + 1, m)) for n, m in zip(self.dlayers, self.dlayers[1:])]
-        )
+        mseconst = 2 / self.dlayers[-1]
+        gradients = [np.zeros_like(wm) for wm in self.weight]
 
-        assert all(
-            g.shape == w.shape for g, w in zip(gradients, self.weight)
-        ), "gradients is not the same shape as weights"
-
-        for k in reversed(range(len(self.dlayers) - 1)):
-            n = self.dlayers[k]
-            m = self.dlayers[k + 1]
+        for k in reversed(range(L)):
+            n, m = self.dlayers[k], self.dlayers[k + 1]
             for j in range(m):
                 for i in range(n + 1):  # +1 for bias neuron
-                    gradients[k][i, j] = sum(
-                        (self.activation[L][q] - expected[q]) * self.dadw(L, q, k, i, j)
+                    gradients[k][i, j] = mseconst * sum(
+                        (self.activation[L][q] - target[q]) * self.dadw(L, q, k, i, j)
                         for q in range(self.dlayers[-1])
                     )
         return gradients
@@ -205,7 +200,7 @@ class NeuralNetwork:
         self._DADW_cache[args] = res
         return res
 
-    def get_error_gradient(self, expected):
+    def get_error_gradient(self, target):
         L = len(self.dlayers) - 1  # Last layer index
         gradients = [
             np.empty((n + 1, m)) for n, m in zip(self.dlayers, self.dlayers[1:])
@@ -217,16 +212,16 @@ class NeuralNetwork:
 
         for k in reversed(range(len(self.dlayers) - 1)):
             gradients[k] = sum(
-                (self.activation[L][q] - expected[q]) * self.DADW(L, q, k)
+                (self.activation[L][q] - target[q]) * self.DADW(L, q, k)
                 for q in range(self.dlayers[-1])
             )
         return gradients
 
-    def backpropagate(self, gradients=None, expected=None):
-        assert gradients is not None or expected is not None
+    def backpropagate(self, gradients=None, target=None):
+        assert gradients is not None or target is not None
         if gradients is None:
-            # gradients = self.get_error_gradient_slow(expected)
-            gradients = self.get_error_gradient(expected)
+            # gradients = self.get_error_gradient_slow(target)
+            gradients = self.get_error_gradient(target)
         e = 1e-1  # learning rate
         a = 0 * e  # momentum
         if hasattr(self, "oldgradients"):

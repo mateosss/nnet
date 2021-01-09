@@ -1,7 +1,6 @@
-"NeuralNetwork unit tests"
+"""NeuralNetwork unit tests"""
 
 from dataclasses import dataclass
-from random import random
 
 import numpy as np
 from numpy.linalg import norm
@@ -14,6 +13,11 @@ from nnet import NeuralNetwork
 np.random.seed(1)  # TODO: Remove?
 WTOL = 10  # weights must be within [-WTOL, +WTOL]
 COMPLETENESS = 0.05  # ratio of loops that will be effectively tested
+
+SAMPLE = mnist.read()
+LABEL, IMAGE = next(SAMPLE)  # the one image used for testing
+INPUT = [pixel / 255 for row in IMAGE for pixel in row]
+TARGET = [1 if i == LABEL else 0 for i in range(10)]
 
 
 @dataclass
@@ -46,6 +50,7 @@ class Loop:
 
 
 def test_get_random_params():
+    """It generates reasonable params."""
     dlayers = [1024, 32, 64, 47]
     nnet = NeuralNetwork(dlayers)
     params = nnet.get_random_params()
@@ -56,7 +61,8 @@ def test_get_random_params():
     assert all(-WTOL <= p <= WTOL for p in params)
 
 
-def test_params_conversion():
+def test_weights_from_params():
+    """It reshapes the flat list of params properly."""
     dlayers = [1024, 32, 64, 47]
     nnet = NeuralNetwork(dlayers)
     params = nnet.get_random_params()
@@ -74,31 +80,33 @@ def test_params_conversion():
     assert all(a[-1] == 1 for a in nnet.activation)
 
 
-def test_numerical_vs_analytical_dadw(completeness=COMPLETENESS):
+def test_dadw(completeness=COMPLETENESS):
+    """It is similar to a numerical gradient.
+
+    It predicts a change in output neurons close enough to what a slight numerical
+    nudge to each weight produces to the network outputs.
+    """
     dlayers = [784, 16, 16, 10]
     L = len(dlayers) - 1  # Last layer index
     net = NeuralNetwork(dlayers)
-
-    label, image = next(mnist.read())
-    ninput = [pixel / 255 for row in image for pixel in row]
 
     # maximum relative difference between numerical and analytical dadw
     maxreldiff = 0
     epsilon = 1e-5
 
     iterations = 785 * 16 + 17 * 16 + 17 * 10  # hardcoded for specific dlayers
-    loop = Loop("dadw {} out of {}", 1000, iterations, completeness)
+    loop = Loop("[dadw] {}/{}", 1000, iterations, completeness)
     for k, wmatrix in enumerate(net.weight):
         for (i, j), w in np.ndenumerate(wmatrix):
             if not loop():
                 continue
             wmatrix[i, j] = w - epsilon
-            a_out = net.feedforward(ninput)
+            a_out = net.feedforward(INPUT)
             wmatrix[i, j] = w + epsilon
-            b_out = net.feedforward(ninput)
+            b_out = net.feedforward(INPUT)
             ndadw = (b_out - a_out) / (2 * epsilon)
             wmatrix[i, j] = w
-            net.feedforward(ninput)  # Refreshes net fanin and activation
+            net.feedforward(INPUT)  # Refreshes net fanin and activation
             adadw = np.array([net.dadw(L, q, k, i, j) for q in range(dlayers[-1])])
             # greatest relative difference
             diff = max(abs(ndadw - adadw)) / (
@@ -107,7 +115,33 @@ def test_numerical_vs_analytical_dadw(completeness=COMPLETENESS):
             if diff > maxreldiff:
                 maxreldiff = diff
                 assert maxreldiff < 0.01, f"{maxreldiff=} should be less than 1%"
-    print(f"maxreldiff={maxreldiff * 100:.5f}% between numeric and analytical dadw")
+    print(
+        f"[dadw] maxreldiff={maxreldiff * 100:.5f}% between numeric and analytical dadw"
+    )
+
+
+def test_get_gradient_slow():
+    """Make one big update with the error gradient and assert it is almost perfect."""
+    nnet = NeuralNetwork([784, 16, 16, 10])
+
+    old_out = nnet.feedforward(INPUT)
+    old_error = nnet.get_error(TARGET)
+    gradients = nnet.get_gradients_slow(TARGET)
+
+    for wm, gm in zip(nnet.weight, gradients):
+        wm[...] -= gm * 1000
+
+    new_out = nnet.feedforward(INPUT)
+    new_error = nnet.get_error(TARGET)
+    print(
+        "[get_gradient_slow] "
+        f"{old_error=:.6f}, "
+        f"max{{|old_out - target|}} = {max(abs(old_out - TARGET)):.6f}, "
+        f"{new_error=:.6f}, "
+        f"max{{|new_out - target|}} = {max(abs(new_out - TARGET)):.6f}"
+    )
+    assert np.isclose(new_error, 0)
+    assert np.allclose(new_out, TARGET)
 
 
 def test_numerical_gradient_checking(completeness=COMPLETENESS):
@@ -115,9 +149,6 @@ def test_numerical_gradient_checking(completeness=COMPLETENESS):
 
     Based on https://cs231n.github.io/neural-networks-3/#gradcheck
     """
-    label, image = next(mnist.read())
-    ninput = [pixel / 255 for row in image for pixel in row]
-    expected = [1 if i == label else 0 for i in range(10)]
     nnet = NeuralNetwork([784, 16, 16, 10])
 
     epsilon = 1e-5
@@ -130,14 +161,14 @@ def test_numerical_gradient_checking(completeness=COMPLETENESS):
             if not loop():  # Use this to make the test quicker
                 continue
             wmatrix[i] = w - epsilon
-            nnet.feedforward(ninput)
-            a = nnet.get_error(expected)
+            nnet.feedforward(INPUT)
+            a = nnet.get_error(TARGET)
             wmatrix[i] = w + epsilon
-            nnet.feedforward(ninput)
-            b = nnet.get_error(expected)
+            nnet.feedforward(INPUT)
+            b = nnet.get_error(TARGET)
             numgrad[k][i] = (b - a) / (2 * epsilon)  # centered formula
             wmatrix[i] = w
-    error_gradient = nnet.get_error_gradient(expected)
+    error_gradient = nnet.get_error_gradient(TARGET)
 
     unit = lambda v: v / norm(v) if (v != 0).any() else np.zeros(v.shape)
 
