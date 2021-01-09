@@ -14,8 +14,8 @@ gprime = lambda h: g(h) * (1 - g(h))  # g'(in^l_q)
 class NeuralNetwork:
     # n and m will refer to the size of current and next layer in comments
     dlayers: List[int]  # Layer description
-    weight: List  # List of (n + 1) * m matrices (+1 for bias)
-    activation: List  # List of n length vectors
+    weights: List  # List of (n + 1) * m matrices (+1 for bias)
+    activations: List  # List of n length vectors
 
     _dadw_cache: Dict
 
@@ -26,11 +26,11 @@ class NeuralNetwork:
         """
         self.dlayers = dlayers
         self.fanin = [np.zeros(n) for n in [0] + dlayers[1:]]  # weighted sum for neuron
-        self.activation = [np.concatenate((np.zeros(n), [1])) for n in dlayers]
+        self.activations = [np.concatenate((np.zeros(n), [1])) for n in dlayers]
 
         # Set weights
         params = params if params is not None else self.get_random_params()
-        self.weight = self.weights_from_params(params)
+        self.weights = self.weights_from_params(params)
 
         self._dadw_cache = {}
 
@@ -52,7 +52,7 @@ class NeuralNetwork:
     @property
     def params(self):
         """Return parameter list that can be used to recreate this network."""
-        return np.array([w for m in self.weight for r in m for w in r])
+        return np.array([w for m in self.weights for r in m for w in r])
 
     def weights_from_params(self, params) -> List[np.array]:
         """Map the flat params iterable to a proper weight matrix.
@@ -78,15 +78,15 @@ class NeuralNetwork:
         """
         self._dadw_cache = {}  # Previous cache invalid for this feedforward
 
-        self.activation[0][:-1] = ilayer
+        self.activations[0][:-1] = ilayer
         for k in range(1, len(self.dlayers)):
-            self.fanin[k] = self.activation[k - 1] @ self.weight[k - 1]
-            self.activation[k][:-1] = g(self.fanin[k])
-        return self.activation[-1][:-1].copy()  # Remove bias neuron from result
+            self.fanin[k] = self.activations[k - 1] @ self.weights[k - 1]
+            self.activations[k][:-1] = g(self.fanin[k])
+        return self.activations[-1][:-1].copy()  # Remove bias neuron from result
 
     def get_error(self, tgt: List[float]):
         """Return mean squared error, target tgt has an output-like structure."""
-        return sum((o - e) ** 2 for o, e in zip(self.activation[-1], tgt)) / len(tgt)
+        return sum((o - e) ** 2 for o, e in zip(self.activations[-1], tgt)) / len(tgt)
 
     def dadw(self, l, q, k, i, j) -> float:
         """Return derivative of a^l_q with respect to w^k_ij."""
@@ -98,7 +98,7 @@ class NeuralNetwork:
         # Range assertions
         assert l >= 0 and l < len(self.dlayers), f"out of range {l=}"
         assert k >= 0 and k < len(self.dlayers), f"out of range {k=}"
-        assert i >= 0 and i < self.activation[k].size, f"out of range {i=}"
+        assert i >= 0 and i < self.activations[k].size, f"out of range {i=}"
         assert j >= 0 and j < self.dlayers[k], f"out of range {j=}"
 
         # Usage assertions
@@ -112,16 +112,16 @@ class NeuralNetwork:
         elif k == l - 1 and j != q:  # Weight just before neuron but disconnected
             res = 0
         elif k == l - 1 and j == q:  # Weight just before neuron and connected
-            res = self.activation[k][i]
+            res = self.activations[k][i]
         elif k == l - 2:  # Special case for performance, not needed for correctness
             res = (
-                self.weight[l - 1][j, q]
+                self.weights[l - 1][j, q]
                 * gprime(self.fanin[l - 1][j])
-                * self.activation[k][i]
+                * self.activations[k][i]
             )
         elif k < l - 1:
             res = sum(
-                self.weight[l - 1][r, q] * self.dadw(l - 1, r, k, i, j)
+                self.weights[l - 1][r, q] * self.dadw(l - 1, r, k, i, j)
                 for r in range(self.dlayers[l - 1])
             )
         else:
@@ -138,14 +138,14 @@ class NeuralNetwork:
         """Matrix of each error gradient ∇E^k_{i, j} using dadw()."""
         L = len(self.dlayers) - 1  # Last layer index
         mseconst = 2 / self.dlayers[-1]
-        gradients = [np.zeros_like(wm) for wm in self.weight]
+        gradients = [np.zeros_like(wm) for wm in self.weights]
 
         for k in reversed(range(L)):
             n, m = self.dlayers[k], self.dlayers[k + 1]
             for j in range(m):
                 for i in range(n + 1):  # +1 for bias neuron
                     gradients[k][i, j] = mseconst * sum(
-                        (self.activation[L][q] - target[q]) * self.dadw(L, q, k, i, j)
+                        (self.activations[L][q] - target[q]) * self.dadw(L, q, k, i, j)
                         for q in range(self.dlayers[-1])
                     )
         return gradients
@@ -162,8 +162,8 @@ class NeuralNetwork:
         elif k < l - 1:
             res = np.zeros((self.dlayers[k] + 1, self.dlayers[k + 1]))
             for r in range(self.dlayers[l - 1]):
-                res += self.weight[l - 1][r, q] * self.DADW_slow(l - 1, r, k)
-            alq = self.activation[l][q]
+                res += self.weights[l - 1][r, q] * self.DADW_slow(l - 1, r, k)
+            alq = self.activations[l][q]
             res *= alq * (1 - alq)
         else:
             print("This execution branch should not be reached.")
@@ -180,17 +180,17 @@ class NeuralNetwork:
             # TODO: Careful here, I'm returning a reference and not a copy of this matrix
             return self._DADW_cache[args]
 
-        alq = self.activation[l][q]
+        alq = self.activations[l][q]
         if k == l - 1:
             res = np.zeros((self.dlayers[k] + 1, self.dlayers[k + 1]))
             # TODO: sigmoid specific, generalize.
-            res[:, q] = alq * (1 - alq) * self.activation[k]
+            res[:, q] = alq * (1 - alq) * self.activations[k]
         elif k < l - 1:
             res = (
                 alq
                 * (1 - alq)
                 * sum(
-                    self.weight[l - 1][r, q] * self.DADW(l - 1, r, k)
+                    self.weights[l - 1][r, q] * self.DADW(l - 1, r, k)
                     for r in range(self.dlayers[l - 1])
                 )
             )
@@ -207,12 +207,12 @@ class NeuralNetwork:
         ]
 
         assert all(
-            g.shape == w.shape for g, w in zip(gradients, self.weight)
+            g.shape == w.shape for g, w in zip(gradients, self.weights)
         ), "gradients is not the same shape as weights"
 
         for k in reversed(range(len(self.dlayers) - 1)):
             gradients[k] = sum(
-                (self.activation[L][q] - target[q]) * self.DADW(L, q, k)
+                (self.activations[L][q] - target[q]) * self.DADW(L, q, k)
                 for q in range(self.dlayers[-1])
             )
         return gradients
@@ -225,10 +225,10 @@ class NeuralNetwork:
         e = 1e-1  # learning rate
         a = 0 * e  # momentum
         if hasattr(self, "oldgradients"):
-            for w, g, o in zip(self.weight, gradients, self.oldgradients):
+            for w, g, o in zip(self.weights, gradients, self.oldgradients):
                 w[...] -= e * g * (1 - a) + a * o
         else:
-            for w, g in zip(self.weight, gradients):
+            for w, g in zip(self.weights, gradients):
                 w[...] -= e * g
 
         self.oldgradients = gradients

@@ -52,7 +52,7 @@ def backpropagation_main():
                 guess = nnet.feedforward(ninput)
                 if i == 0 and j % 250 == 0:
                     print(f"expected={expected}, guess={guess}")
-                    print(f"{nnet.activation[-2]}")
+                    print(f"{nnet.activations[-2]}")
                 cost[i] = nnet.get_error(expected)
                 cost_gradient[i] = nnet.get_error_gradient(expected)
         except KeyboardInterrupt:

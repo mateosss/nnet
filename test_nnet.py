@@ -77,7 +77,7 @@ def test_weights_from_params():
         w.shape == (dlayers[i - 1] + 1, dlayers[i]) for i, w in enumerate(weights, 1)
     )
     assert all(-WTOL <= p <= WTOL for w in weights for p in np.nditer(w))
-    assert all(a[-1] == 1 for a in nnet.activation)
+    assert all(a[-1] == 1 for a in nnet.activations)
 
 
 def test_dadw(completeness=COMPLETENESS):
@@ -96,7 +96,7 @@ def test_dadw(completeness=COMPLETENESS):
 
     iterations = 785 * 16 + 17 * 16 + 17 * 10  # hardcoded for specific dlayers
     loop = Loop("[dadw] {}/{}", 1000, iterations, completeness)
-    for k, wmatrix in enumerate(net.weight):
+    for k, wmatrix in enumerate(net.weights):
         for (i, j), w in np.ndenumerate(wmatrix):
             if not loop():
                 continue
@@ -120,7 +120,7 @@ def test_dadw(completeness=COMPLETENESS):
     )
 
 
-def test_get_gradient_slow():
+def test_get_gradients_slow():
     """Make one big update with the error gradient and assert it is almost perfect."""
     nnet = NeuralNetwork([784, 16, 16, 10])
 
@@ -128,13 +128,13 @@ def test_get_gradient_slow():
     old_error = nnet.get_error(TARGET)
     gradients = nnet.get_gradients_slow(TARGET)
 
-    for wm, gm in zip(nnet.weight, gradients):
+    for wm, gm in zip(nnet.weights, gradients):
         wm[...] -= gm * 1000
 
     new_out = nnet.feedforward(INPUT)
     new_error = nnet.get_error(TARGET)
     print(
-        "[get_gradient_slow] "
+        "[get_gradients_slow] "
         f"{old_error=:.6f}, "
         f"max{{|old_out - target|}} = {max(abs(old_out - TARGET)):.6f}, "
         f"{new_error=:.6f}, "
@@ -152,11 +152,11 @@ def test_numerical_gradient_checking(completeness=COMPLETENESS):
     nnet = NeuralNetwork([784, 16, 16, 10])
 
     epsilon = 1e-5
-    numgrad = [np.empty(wmatrix.shape) for wmatrix in nnet.weight]
+    numgrad = [np.empty(wmatrix.shape) for wmatrix in nnet.weights]
 
     iterations = 785 * 16 + 17 * 16 + 17 * 10  # hardcoded for specific dlayers
     loop = Loop("numgrad {} out of {}", 1000, iterations, completeness)
-    for k, wmatrix in enumerate(nnet.weight):
+    for k, wmatrix in enumerate(nnet.weights):
         for i, w in np.ndenumerate(wmatrix):
             if not loop():  # Use this to make the test quicker
                 continue
@@ -172,7 +172,7 @@ def test_numerical_gradient_checking(completeness=COMPLETENESS):
 
     unit = lambda v: v / norm(v) if (v != 0).any() else np.zeros(v.shape)
 
-    for k in range(len(nnet.weight)):
+    for k in range(len(nnet.weights)):
         ag = unit(error_gradient[k])
         ng = unit(numgrad[k])
         print(f"cs231 = {norm(ag - ng) / max(norm(ag), norm(ng))}")
