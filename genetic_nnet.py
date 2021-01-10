@@ -44,7 +44,8 @@ class GANeuralNetwork(Subject, NeuralNetwork):
         for i, (label, image) in enumerate(db): # TODO: parallelize runs
             # Run network
             ninput = [pixel / 255 for row in image for pixel in row] # Normalized
-            guess = self(self.genome, ninput)
+            self.weights = self.weights_from_params(self.genome)
+            guess = self.feedforward(ninput)
             # Cost calculation
             expected = [1 if i == label else 0 for i in range(10)]
             costs[i] = sum((g - e)**2 for g, e in zip(guess, expected))

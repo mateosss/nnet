@@ -1,5 +1,8 @@
 "Main user of nnet module"
 
+import itertools as it
+from time import time
+
 import numpy as np
 
 import mnist
@@ -10,6 +13,12 @@ from nnet import NeuralNetwork
 # TODO: Add argparse options to configure the run
 
 DLAYERS = [784, 16, 16, 10]
+EPOCHS = 16
+BATCH_SIZE = 1000
+
+LOG_SAMPLE_FREQ = 10000  # How many samples between logs
+assert LOG_SAMPLE_FREQ % BATCH_SIZE == 0, "should be multiples"
+LOG_FREQ = LOG_SAMPLE_FREQ / BATCH_SIZE  # How many batches between logs
 
 # TODO: Save runs to a separate folder and don't overwrite them
 def save_params(params):
@@ -30,76 +39,79 @@ def genetic_main():
     return ga.best
 
 
-def backpropagation_main():
-    labels, images = zip(*list(mnist.read()))
-    batch_size = 2
-    offset = 0
-
-    ninputs = [
-        [pixel / 255 for row in image for pixel in row]
-        for image in images[offset : offset + batch_size]
-    ]
-    expected_outputs = [
-        [1 if i == label else 0 for i in range(10)]
-        for label in labels[offset : offset + batch_size]
-    ]
-    nnet = NeuralNetwork(DLAYERS, params=None)
-    cost_gradient = [None] * batch_size
-    cost = np.empty(batch_size)
-    for j in range(1024 ** 10):  #
-        try:
-            for i, (ninput, expected) in enumerate(zip(ninputs, expected_outputs)):
-                guess = nnet.feedforward(ninput)
-                if i == 0 and j % 250 == 0:
-                    print(f"expected={expected}, guess={guess}")
-                    print(f"{nnet.activations[-2]}")
-                cost[i] = nnet.get_error(expected)
-                cost_gradient[i] = nnet.get_gradients(expected)
-        except KeyboardInterrupt:
-            break
-        print(f"[{j + 1}] cost = {cost.mean()}")
-        batch_gradient = np.mean(cost_gradient, axis=0)
-        nnet.update_weights(batch_gradient)
-    # guess = nnet.feedforward(ninput)
-    # cost = nnet.get_error(expected)
-    # print(f"[{i + 1}] cost = {cost}")
-    # save_params(nnet.params)
+def test(trainbatches, testbatches, net: NeuralNetwork, epoch):
+    itime = time()
+    train_cumloss = 0
+    test_cumloss = 0
+    for batch in trainbatches:
+        train_cumloss += net.batch_eval(batch, BATCH_SIZE, calc_grads=False)
+    for batch in testbatches:
+        test_cumloss += net.batch_eval(batch, BATCH_SIZE, calc_grads=False)
+    train_avgloss = train_cumloss / len(trainbatches)
+    test_avgloss = test_cumloss / len(testbatches)
+    test_time = time() - itime
+    print(
+        f"[E] [{epoch + 1}] {train_avgloss=:.6f} {test_avgloss=:.6f} {test_time=:.2f}s"
+    )
 
 
-# TODO: Report network confidence and cost, not only hits/misses
-def test_and_report_against(nn, samples, print_every=50):
-    "Reports stats about how the nn network performs against given samples"
-    hits = 0
-    for i, (label, image) in enumerate(samples):
-        ninput = [pixel / 255 for row in image for pixel in row]  # Normalized
-        guess = nn.feedforward(ninput)  # network guess
-        expected = [1 if i == label else 0 for i in range(10)]
-        guessed = [1 if i == max(guess) else 0 for i in guess]  # pragmatic guess
-        hits += guessed == expected
-        if (i + 1) % print_every == 0:
+def train_epoch(trainbatches, net: NeuralNetwork, epoch):
+    log_loss = 0
+    log_time = time()
+    for i, batch in enumerate(trainbatches):
+        print(f">>> evaluating batch {i=}")
+        loss, gradients = net.batch_eval(batch, BATCH_SIZE)
+        print(f">>> updating weights")
+        net.update_weights(gradients)
+
+        # Assert improved loss
+        print(f">>> asserting improvement")
+        new_loss = net.batch_eval(batch, BATCH_SIZE, calc_grads=False)
+        if new_loss > loss:
+            print(f"[W] loss increased by {100 * (new_loss - loss) / loss:.2f}%")
+
+        log_loss += loss
+        if i % LOG_FREQ == LOG_FREQ - 1:
             print(
-                f"Run {i + 1}/{len(samples)}\n"
-                f"""[guess] squashed [0, 1] = {np.round(np.interp(
-                    guess, [guess.min(), guess.max()], [0, 1]
-                ), 6)}\n"""
-                f"[expected] = {expected}\n"
+                f"[TR] [{epoch + 1}, {(i + 1) * BATCH_SIZE}] [{time() - log_time:.2f}s] "
+                f"loss: {log_loss / LOG_FREQ:.3f}"
             )
-    misses = len(samples) - hits
-    print(f"\nHits: {hits} | Misses: {misses} -> {100 * hits / len(samples)}%")
+            log_time = time()
+            log_loss = 0
 
 
-def test_trained(params=None, head=100, tail=100):
-    "Tests a network with params against first `head` and last `tail` samples"
-    params = params if params is not None else load_params()
-    nnet = NeuralNetwork(DLAYERS, params)
-    mnist_db = list(mnist.read())
-    print("[KNOWN]")
-    test_and_report_against(nnet, mnist_db[:head])  # Training dataset
-    print("[UNKNOWN]")
-    test_and_report_against(nnet, mnist_db[-tail:])  # Unknown dataset
+def train(net: NeuralNetwork, trainbatches, testbatches):
+    itime = time()
+    for epoch in range(EPOCHS):
+        print(f">>> start {epoch=} train")
+        train_epoch(trainbatches, net, epoch)
+        print(f">>> start {epoch=} test")
+        test(trainbatches, testbatches, net, epoch)
+    print(f"[FINISH] Training finished in {time() - itime:.2f}s.")
+
+
+def init_datasets():
+    dataset_types = ["training", "testing"]
+    batches = {t: [] for t in dataset_types}
+    for dataset in dataset_types:
+        data = mnist.read(dataset)
+        while True:
+            batch = list(it.islice(data, BATCH_SIZE))
+            if batch == []:
+                break
+            for i, (image, label) in zip(range(BATCH_SIZE), batch):
+                batch[i] = (image.reshape(-1) / 255, label)
+            batches[dataset].append(batch)
+    return batches["training"], batches["testing"]
+
+
+def main():
+    net = NeuralNetwork(DLAYERS)
+    trainbatches, testbatches = init_datasets()
+    print(">>> datasets initialized")
+    train(net, trainbatches, testbatches)
 
 
 if __name__ == "__main__":
     # best_params = genetic_main()
-    # test_trained(best_params)
-    backpropagation_main()
+    main()

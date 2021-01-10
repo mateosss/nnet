@@ -77,7 +77,7 @@ class NeuralNetwork:
             weights[k] = params[offset_layer[k] : offset_layer[k + 1]].reshape((n, m))
         return weights
 
-    def feedforward(self, ilayer):
+    def feedforward(self, ilayer) -> np.array:
         """Forward propagation of the network, fill activation vectors.
 
         ilayer: Normalized input layer scaled in range [0, 1]
@@ -198,3 +198,27 @@ class NeuralNetwork:
         momentum = momentum if prev_run else 0
         for wm, gm, pgm in zip(self.weights, gradients, prev_grads):
             wm[...] -= lr * gm * (1 - momentum) + pgm * momentum
+
+    def batch_eval(self, batch, batch_size, calc_grads=True):
+        """Return mean losses and mean gradients (if calc_grads) over a batch.
+
+        All batches must be not larger than batch_size.
+        """
+        batch_losses = np.empty(batch_size)
+        batch_gradients: List = [None] * batch_size
+        j = 0
+        for j, (inputt, label) in enumerate(batch):
+            self.feedforward(inputt)
+            target = np.array([1 if i == label else 0 for i in range(10)])
+            batch_losses[j] = self.get_error(target)
+            if calc_grads:
+                batch_gradients[j] = self.get_gradients(target)
+        assert len(batch_losses) == len(batch_losses[: j + 1]) # TODO: remove assertions
+        assert len(batch_gradients) == len(batch_gradients[: j + 1])
+        batch_losses = batch_losses[: j + 1] # Needed for batches smaller than batch_size
+        batch_gradients = batch_gradients[: j + 1]
+        batch_loss = batch_losses.mean()
+        if calc_grads:
+            batch_gradient = [np.mean(grads, axis=0) for grads in zip(*batch_gradients)]
+            return batch_loss, batch_gradient
+        return batch_loss
