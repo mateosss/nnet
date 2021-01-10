@@ -16,6 +16,10 @@ DLAYERS = [784, 16, 16, 10]
 EPOCHS = 16
 BATCH_SIZE = 1000
 
+# TODO: Hardcoding dataset lengths
+TEST_BATCHES = 60000 // BATCH_SIZE
+TRAIN_BATCHES = 10000 // BATCH_SIZE
+
 LOG_SAMPLE_FREQ = 10000  # How many samples between logs
 assert LOG_SAMPLE_FREQ % BATCH_SIZE == 0, "should be multiples"
 LOG_FREQ = LOG_SAMPLE_FREQ / BATCH_SIZE  # How many batches between logs
@@ -39,34 +43,58 @@ def genetic_main():
     return ga.best
 
 
-def test(trainbatches, testbatches, net: NeuralNetwork, epoch):
+def dataset(dataset_type="training"):
+    """Use type training or testing."""
+    data = mnist.read(dataset_type)
+    while True:
+        pair_imglbl = tuple(zip(*it.islice(data, BATCH_SIZE)))
+        if not pair_imglbl:
+            return
+        images, labels = pair_imglbl
+        images = np.array(images).reshape(BATCH_SIZE, 28 * 28)
+        labels = np.array([[1 if q == l else 0 for q in range(10)] for l in labels])
+        yield images, labels
+
+
+def test(net: NeuralNetwork, epoch):
     itime = time()
     train_cumloss = 0
     test_cumloss = 0
-    for batch in trainbatches:
-        train_cumloss += net.batch_eval(batch, BATCH_SIZE, calc_grads=False)
-    for batch in testbatches:
-        test_cumloss += net.batch_eval(batch, BATCH_SIZE, calc_grads=False)
-    train_avgloss = train_cumloss / len(trainbatches)
-    test_avgloss = test_cumloss / len(testbatches)
+    for (inputs, targets) in dataset("training"):
+        outputs = net.feedforward(inputs)
+        errors = net.get_error(targets)
+        loss = errors.mean()
+        train_cumloss += loss
+    for (inputs, targets) in dataset("testing"):
+        outputs = net.feedforward(inputs)
+        errors = net.get_error(targets)
+        loss = errors.mean()
+        train_cumloss += loss
+    train_avgloss = train_cumloss / TRAIN_BATCHES
+    test_avgloss = test_cumloss / TEST_BATCHES
     test_time = time() - itime
     print(
         f"[E] [{epoch + 1}] {train_avgloss=:.6f} {test_avgloss=:.6f} {test_time=:.2f}s"
     )
 
 
-def train_epoch(trainbatches, net: NeuralNetwork, epoch):
+def train_epoch(net: NeuralNetwork, epoch):
     log_loss = 0
     log_time = time()
-    for i, batch in enumerate(trainbatches):
+    for i, (inputs, targets) in enumerate(dataset("training")):
         print(f">>> evaluating batch {i=}")
-        loss, gradients = net.batch_eval(batch, BATCH_SIZE)
+        outputs = net.feedforward(inputs)
+        errors = net.get_error(targets)
+        loss = errors.mean()
+        gradients = net.get_gradients(targets)
+        batch_gradient = [np.mean(grads, axis=0) for grads in zip(*gradients)]
         print(f">>> updating weights")
-        net.update_weights(gradients)
+        net.update_weights(batch_gradient)
 
         # Assert improved loss
         print(f">>> asserting improvement")
-        new_loss = net.batch_eval(batch, BATCH_SIZE, calc_grads=False)
+        net.feedforward(inputs)
+        new_loss = net.get_error(targets).mean()
         if new_loss > loss:
             print(f"[W] loss increased by {100 * (new_loss - loss) / loss:.2f}%")
 
@@ -80,36 +108,20 @@ def train_epoch(trainbatches, net: NeuralNetwork, epoch):
             log_loss = 0
 
 
-def train(net: NeuralNetwork, trainbatches, testbatches):
+def train(net: NeuralNetwork):
     itime = time()
     for epoch in range(EPOCHS):
         print(f">>> start {epoch=} train")
-        train_epoch(trainbatches, net, epoch)
+        train_epoch(net, epoch)
         print(f">>> start {epoch=} test")
-        test(trainbatches, testbatches, net, epoch)
+        test(net, epoch)
     print(f"[FINISH] Training finished in {time() - itime:.2f}s.")
-
-
-def init_datasets():
-    dataset_types = ["training", "testing"]
-    batches = {t: [] for t in dataset_types}
-    for dataset in dataset_types:
-        data = mnist.read(dataset)
-        while True:
-            batch = list(it.islice(data, BATCH_SIZE))
-            if batch == []:
-                break
-            for i, (image, label) in zip(range(BATCH_SIZE), batch):
-                batch[i] = (image.reshape(-1) / 255, label)
-            batches[dataset].append(batch)
-    return batches["training"], batches["testing"]
 
 
 def main():
     net = NeuralNetwork(DLAYERS)
-    trainbatches, testbatches = init_datasets()
     print(">>> datasets initialized")
-    train(net, trainbatches, testbatches)
+    train(net)
 
 
 if __name__ == "__main__":
