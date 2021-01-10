@@ -32,7 +32,7 @@ def genetic_main():
 
 def backpropagation_main():
     labels, images = zip(*list(mnist.read()))
-    batch_size = 1000
+    batch_size = 2
     offset = 0
 
     ninputs = [
@@ -59,7 +59,7 @@ def backpropagation_main():
             break
         print(f"[{j + 1}] cost = {cost.mean()}")
         batch_gradient = np.mean(cost_gradient, axis=0)
-        nnet.backpropagate(gradients=batch_gradient)
+        nnet.update_weights(batch_gradient)
     # guess = nnet.feedforward(ninput)
     # cost = nnet.get_error(expected)
     # print(f"[{i + 1}] cost = {cost}")

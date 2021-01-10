@@ -17,6 +17,9 @@ class NeuralNetwork:
     weights: List  # List of (n + 1) * m matrices (+1 for bias)
     activations: List  # List of n length vectors
 
+    gradients: List  # same shape as self.weight, storage for error gradients of weights
+    fanin: List  # same shape as self.activation, storage for the fan in of each neuron
+
     _dadw_cache: Dict
     _DADW_cache: Dict
 
@@ -32,6 +35,8 @@ class NeuralNetwork:
         # Set weights
         params = params if params is not None else self.get_random_params()
         self.weights = self.weights_from_params(params)
+
+        self.gradients = [np.zeros_like(wm) for wm in self.weights]
 
         self._dadw_cache = {}
         self._DADW_cache = {}
@@ -186,18 +191,10 @@ class NeuralNetwork:
             )
         return gradients
 
-    def backpropagate(self, gradients=None, target=None):
-        assert gradients is not None or target is not None
-        if gradients is None:
-            gradients = self.get_gradients(target)
-        e = 1e-1  # learning rate
-        a = 0 * e  # momentum
-        if hasattr(self, "oldgradients"):
-            for w, g, o in zip(self.weights, gradients, self.oldgradients):
-                w[...] -= e * g * (1 - a) + a * o
-        else:
-            for w, g in zip(self.weights, gradients):
-                w[...] -= e * g
-
-        self.oldgradients = gradients
-        # del dadw.cache
+    def update_weights(self, gradients, lr=100, momentum=0.9):
+        """Update weights using stochastic gradient decent."""
+        prev_grads = self.gradients
+        prev_run = any(gm.any() for gm in prev_grads)
+        momentum = momentum if prev_run else 0
+        for wm, gm, pgm in zip(self.weights, gradients, prev_grads):
+            wm[...] -= lr * gm * (1 - momentum) + pgm * momentum
