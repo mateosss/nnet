@@ -134,10 +134,11 @@ def test_get_gradients():
     old_out = nnet.feedforward(INPUT)
     old_error = nnet.get_error(TARGET)
     grads_dadw = nnet.get_gradients_slow(TARGET)
-    grads_DADWs = nnet.get_gradients(TARGET, slow=True)
+    grads_DADW = nnet.get_gradients(TARGET)
 
     assert all(
-        np.allclose(s, sm, rtol=0, atol=1e-17) for s, sm in zip(grads_dadw, grads_DADWs)
+        np.allclose(gm, gmf, rtol=0, atol=1e-17)
+        for gm, gmf in zip(grads_dadw, grads_DADW)
     )
 
     for wm, gm in zip(nnet.weights, grads_dadw):
@@ -146,7 +147,7 @@ def test_get_gradients():
     new_out = nnet.feedforward(INPUT)
     new_error = nnet.get_error(TARGET)
     print(
-        "[get_gradients_slow] "
+        "[get_gradients] [step] "
         f"{old_error=:.6f}, "
         f"max{{|old_out - target|}} = {max(abs(old_out - TARGET)):.6f}, "
         f"{new_error=:.6f}, "
@@ -180,7 +181,7 @@ def test_numerical_gradient_checking(completeness=COMPLETENESS):
             b = nnet.get_error(TARGET)
             numgrad[k][i] = (b - a) / (2 * epsilon)  # centered formula
             wmatrix[i] = w
-    error_gradient = nnet.get_error_gradient(TARGET)
+    error_gradient = nnet.get_gradients(TARGET)
 
     unit = lambda v: v / norm(v) if (v != 0).any() else np.zeros(v.shape)
 

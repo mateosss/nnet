@@ -18,7 +18,7 @@ class NeuralNetwork:
     activations: List  # List of n length vectors
 
     _dadw_cache: Dict
-    _DADW_slow_cache: Dict
+    _DADW_cache: Dict
 
     def __init__(self, dlayers: List[int], params: List[int] = None):
         """
@@ -34,7 +34,7 @@ class NeuralNetwork:
         self.weights = self.weights_from_params(params)
 
         self._dadw_cache = {}
-        self._DADW_slow_cache = {}
+        self._DADW_cache = {}
 
     # TODO: Understand and try other initializations as xavier and kaiming
     # see https://towardsdatascience.com/weight-initialization-in-neural-networks-a-journey-from-the-basics-to-kaiming-954fb9b47c79
@@ -79,7 +79,7 @@ class NeuralNetwork:
         returns: last layer activations (the guess)
         """
         self._dadw_cache = {}  # Previous cache invalid for this feedforward
-        self._DADW_slow_cache = {}
+        self._DADW_cache = {}
 
         self.activations[0][:-1] = ilayer
         for k in range(1, len(self.dlayers)):
@@ -153,101 +153,43 @@ class NeuralNetwork:
                     )
         return gradients
 
-    def DADW_slow(self, l, q, k):
-        """Matrix A^{l, q}_k of each derivative of dadw(i, j)."""
-
+    def DADW(self, l, q, k):
+        """Read only matrix A^{l, q}_k of each derivative of dadw(i, j)."""
         args = (l, q, k)
-        if args in self._DADW_slow_cache:
-            return self._DADW_slow_cache[args]
+        if args in self._DADW_cache:
+            return self._DADW_cache[args]
 
         if l == k + 1:
-            res = np.array(
-                [
-                    [self.dadw(l, q, k, i, j) for j in range(self.dlayers[k + 1])]
-                    for i in range(self.dlayers[k] + 1)
-                ]
-            )
-        # elif l == k + 1:
-        #     res = np.zeros((self.dlayers[k] + 1, self.dlayers[k + 1]))
-        #     for i in range(self.dlayers[k] + 1):
-        #         res[i, q] = gprime(self.fanin[l][q]) * self.activations[k][i]
-        elif l > k + 1:
             res = np.zeros((self.dlayers[k] + 1, self.dlayers[k + 1]))
-            for r in range(self.dlayers[l - 1]):
-                res[...] += self.weights[l - 1][r, q] * self.DADW_slow(l - 1, r, k)
-            res *= gprime(self.fanin[l][q])
+            res[:, q] = gprime(self.fanin[l][q]) * self.activations[k]
+        elif l > k + 1:
+            res = gprime(self.fanin[l][q]) * sum(
+                self.weights[l - 1][r, q] * self.DADW(l - 1, r, k)
+                for r in range(self.dlayers[l - 1])
+            )
         else:
             raise Exception("This execution branch should not be reached.")
 
-        self._DADW_slow_cache[args] = res
-        return res
-
-    def get_gradients(self, target: np.array, slow=False) -> List[np.array]:
-        """Matrix of each error gradient ∇E^k_{i, j} using DADW() matrices."""
-        DADW = self.DADW_slow if slow else self.DADW
-        L = len(self.dlayers) - 1  # Last layer index
-        mseconst = 2 / self.dlayers[L]
-        gradients = [np.zeros_like(wm) for wm in self.weights]
-        for k in reversed(range(L)):
-            gradients[k] = mseconst * sum(
-                (self.activations[L][q] - target[q]) * DADW(L, q, k)
-                for q in range(self.dlayers[L])
-            )
-        return gradients
-
-    def DADW(self, l, q, k):
-        """Matrix of dadw with positions ij representing dadw(l, q, k, i, j)."""
-
-        # Cache setup
-        if not hasattr(self, "_DADW_cache"):
-            self._DADW_cache = {}
-        args = (l, q, k)
-        if args in self._DADW_cache:
-            # TODO: Careful here, I'm returning a reference and not a copy of this matrix
-            return self._DADW_cache[args]
-
-        alq = self.activations[l][q]
-        if k == l - 1:
-            res = np.zeros((self.dlayers[k] + 1, self.dlayers[k + 1]))
-            # TODO: sigmoid specific, generalize.
-            res[:, q] = alq * (1 - alq) * self.activations[k]
-        elif k < l - 1:
-            res = (
-                alq
-                * (1 - alq)
-                * sum(
-                    self.weights[l - 1][r, q] * self.DADW(l - 1, r, k)
-                    for r in range(self.dlayers[l - 1])
-                )
-            )
-        else:
-            print("This execution branch should not be reached.")
-
+        res.setflags(write=False)  # As the result is cached, we make it readonly
         self._DADW_cache[args] = res
         return res
 
-    def get_error_gradient(self, target):
+    def get_gradients(self, target: np.array) -> List[np.array]:
+        """Matrix of each error gradient ∇E^k_{i, j} using DADW() matrices."""
         L = len(self.dlayers) - 1  # Last layer index
-        gradients = [
-            np.empty((n + 1, m)) for n, m in zip(self.dlayers, self.dlayers[1:])
-        ]
-
-        assert all(
-            g.shape == w.shape for g, w in zip(gradients, self.weights)
-        ), "gradients is not the same shape as weights"
-
-        for k in reversed(range(len(self.dlayers) - 1)):
-            gradients[k] = sum(
+        mseconst = 2 / self.dlayers[L]
+        gradients: List = [None for _ in self.weights]
+        for k in reversed(range(L)):
+            gradients[k] = mseconst * sum(
                 (self.activations[L][q] - target[q]) * self.DADW(L, q, k)
-                for q in range(self.dlayers[-1])
+                for q in range(self.dlayers[L])
             )
         return gradients
 
     def backpropagate(self, gradients=None, target=None):
         assert gradients is not None or target is not None
         if gradients is None:
-            # gradients = self.get_error_gradient_slow(target)
-            gradients = self.get_error_gradient(target)
+            gradients = self.get_gradients(target)
         e = 1e-1  # learning rate
         a = 0 * e  # momentum
         if hasattr(self, "oldgradients"):

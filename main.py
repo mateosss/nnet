@@ -54,7 +54,7 @@ def backpropagation_main():
                     print(f"expected={expected}, guess={guess}")
                     print(f"{nnet.activations[-2]}")
                 cost[i] = nnet.get_error(expected)
-                cost_gradient[i] = nnet.get_error_gradient(expected)
+                cost_gradient[i] = nnet.get_gradients(expected)
         except KeyboardInterrupt:
             break
         print(f"[{j + 1}] cost = {cost.mean()}")
