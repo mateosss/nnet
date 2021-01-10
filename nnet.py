@@ -213,10 +213,11 @@ class NeuralNetwork:
             batch_losses[j] = self.get_error(target)
             if calc_grads:
                 batch_gradients[j] = self.get_gradients(target)
-        assert len(batch_losses) == len(batch_losses[: j + 1]) # TODO: remove assertions
-        assert len(batch_gradients) == len(batch_gradients[: j + 1])
-        batch_losses = batch_losses[: j + 1] # Needed for batches smaller than batch_size
+
+        # Needed for batches smaller than batch_size
+        batch_losses = batch_losses[: j + 1]
         batch_gradients = batch_gradients[: j + 1]
+
         batch_loss = batch_losses.mean()
         if calc_grads:
             batch_gradient = [np.mean(grads, axis=0) for grads in zip(*batch_gradients)]

@@ -18,7 +18,7 @@ WTOL = 10  # weights must be within [-WTOL, +WTOL]
 COMPLETENESS = 0.05  # ratio of loops that will be effectively tested
 
 SAMPLE = mnist.read()
-LABEL, IMAGE = next(SAMPLE)  # the one image used for testing
+IMAGE, LABEL = next(SAMPLE)  # the one image used for testing
 INPUT = [pixel / 255 for row in IMAGE for pixel in row]
 TARGET = [1 if i == LABEL else 0 for i in range(10)]
 
