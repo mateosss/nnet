@@ -44,7 +44,10 @@ def genetic_main():
 
 
 def dataset(dataset_type="training"):
-    """Use type training or testing."""
+    """Generator that returns an interable of (batch_inputs, batch_targets).
+
+    dataset_type = training | testing
+    """
     data = mnist.read(dataset_type)
     while True:
         pair_imglbl = tuple(zip(*it.islice(data, BATCH_SIZE)))
