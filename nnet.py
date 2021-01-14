@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 import numpy as np
 from numpy.random import randn
@@ -207,9 +207,8 @@ class NeuralNetwork:
         batch_losses = np.empty(batch_size)
         batch_gradients: List = [None] * batch_size
         j = 0
-        for j, (inputt, label) in enumerate(batch):
+        for j, (inputt, target) in enumerate(zip(*batch)):
             self.feedforward(inputt)
-            target = np.array([1 if i == label else 0 for i in range(10)])
             batch_losses[j] = self.get_error(target)
             if calc_grads:
                 batch_gradients[j] = self.get_gradients(target)

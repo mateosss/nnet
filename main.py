@@ -2,6 +2,7 @@
 
 import itertools as it
 from time import time
+from typing import Iterator, Tuple
 
 import numpy as np
 
@@ -15,6 +16,9 @@ from nnet import NeuralNetwork
 DLAYERS = [784, 16, 16, 10]
 EPOCHS = 16
 BATCH_SIZE = 1000
+
+# Assertion needed for using dataset()
+assert 60000 % BATCH_SIZE == 0 and 10000 % BATCH_SIZE == 0
 
 LOG_SAMPLE_FREQ = 10000  # How many samples between logs
 assert LOG_SAMPLE_FREQ % BATCH_SIZE == 0, "should be multiples"
@@ -90,24 +94,28 @@ def train(net: NeuralNetwork, trainbatches, testbatches):
     print(f"[FINISH] Training finished in {time() - itime:.2f}s.")
 
 
-def init_datasets():
-    dataset_types = ["training", "testing"]
-    batches = {t: [] for t in dataset_types}
-    for dataset in dataset_types:
-        data = mnist.read(dataset)
-        while True:
-            batch = list(it.islice(data, BATCH_SIZE))
-            if batch == []:
-                break
-            for i, (image, label) in zip(range(BATCH_SIZE), batch):
-                batch[i] = (image.reshape(-1) / 255, label)
-            batches[dataset].append(batch)
-    return batches["training"], batches["testing"]
+def dataset(dataset_type="training") -> Iterator[Tuple]:
+    """Return an iterator of batches.
+
+    A batch structure is as follows:
+    (ndarray of BATCH_SIZEx784 float64's, ndarray of BATCH_SIZE uint8's)
+    dataset_type = training | testing
+    """
+    data = mnist.read(dataset_type)
+    while True:
+        pair_imglbl = tuple(zip(*it.islice(data, BATCH_SIZE)))
+        if not pair_imglbl:
+            return
+        images, labels = pair_imglbl
+        images = np.array(images).reshape(BATCH_SIZE, 28 * 28) / 255
+        labels = np.array([[1 if q == l else 0 for q in range(10)] for l in labels])
+        yield images, labels
 
 
 def main():
     net = NeuralNetwork(DLAYERS)
-    trainbatches, testbatches = init_datasets()
+    trainbatches = list(dataset("training"))
+    testbatches = list(dataset("testing"))
     print(">>> datasets initialized")
     train(net, trainbatches, testbatches)
 
