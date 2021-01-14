@@ -20,7 +20,7 @@ BATCH_SIZE = 1000
 # Assertion needed for using dataset()
 assert 60000 % BATCH_SIZE == 0 and 10000 % BATCH_SIZE == 0
 
-LOG_SAMPLE_FREQ = 10000  # How many samples between logs
+LOG_SAMPLE_FREQ = 1000  # How many samples between logs
 assert LOG_SAMPLE_FREQ % BATCH_SIZE == 0, "should be multiples"
 LOG_FREQ = LOG_SAMPLE_FREQ / BATCH_SIZE  # How many batches between logs
 
@@ -80,6 +80,7 @@ def train_epoch(trainbatches, net: NeuralNetwork, epoch):
                 f"[TR] [{epoch + 1}, {(i + 1) * BATCH_SIZE}] [{time() - log_time:.2f}s] "
                 f"loss: {log_loss / LOG_FREQ:.3f}"
             )
+            print(f">>> {loss=}")
             log_time = time()
             log_loss = 0
 

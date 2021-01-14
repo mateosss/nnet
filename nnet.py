@@ -194,10 +194,12 @@ class NeuralNetwork:
     def update_weights(self, gradients, lr=100, momentum=0.9):
         """Update weights using stochastic gradient decent."""
         prev_grads = self.gradients
-        prev_run = any(gm.any() for gm in prev_grads)
-        momentum = momentum if prev_run else 0
+        first_run = not any(gm.any() for gm in prev_grads)
+        if first_run:
+            momentum = 0
         for wm, gm, pgm in zip(self.weights, gradients, prev_grads):
             wm[...] -= lr * gm * (1 - momentum) + pgm * momentum
+        self.gradients = gradients
 
     def batch_eval(self, batch, batch_size, calc_grads=True):
         """Return mean losses and mean gradients (if calc_grads) over a batch.
