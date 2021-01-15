@@ -164,14 +164,14 @@ class NeuralNetwork:
         if args in self._DADW_cache:
             return self._DADW_cache[args]
 
+        n, m = self.dlayers[k], self.dlayers[k + 1]
+        res = np.zeros((n + 1, m))
         if l == k + 1:
-            res = np.zeros((self.dlayers[k] + 1, self.dlayers[k + 1]))
             res[:, q] = gprime(self.fanin[l][q]) * self.activations[k]
         elif l > k + 1:
-            res = gprime(self.fanin[l][q]) * sum(
-                self.weights[l - 1][r, q] * self.DADW(l - 1, r, k)
-                for r in range(self.dlayers[l - 1])
-            )
+            for r in range(self.dlayers[l - 1]):
+                res += self.weights[l - 1][r, q] * self.DADW(l - 1, r, k)
+            res *= gprime(self.fanin[l][q])
         else:
             raise Exception("This execution branch should not be reached.")
 
