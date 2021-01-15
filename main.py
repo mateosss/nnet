@@ -78,7 +78,7 @@ def train_epoch(trainbatches, net: NeuralNetwork, epoch):
         if i % LOG_FREQ == LOG_FREQ - 1:
             print(
                 f"[TR] [{epoch + 1}, {(i + 1) * BATCH_SIZE}] [{time() - log_time:.2f}s] "
-                f"loss: {log_loss / LOG_FREQ:.3f}"
+                f"avgloss: {log_loss / LOG_FREQ:.3f}"
             )
             print(f">>> {loss=}")
             log_time = time()

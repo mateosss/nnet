@@ -1,4 +1,4 @@
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 from numpy.random import randn
@@ -14,14 +14,15 @@ gprime = lambda h: g(h) * (1 - g(h))  # g'(in^l_q)
 class NeuralNetwork:
     # n and m will refer to the size of current and next layer in comments
     dlayers: List[int]  # Layer description
-    weights: List  # List of (n + 1) * m matrices (+1 for bias)
-    activations: List  # List of n length vectors
+    weights: List  # List of (n + 1, m) arrays (+1 for bias). The synaptic efficacy
+    activations: List  # List of (BATCH_SIZE, n + 1) arrays. The value of a neuron
 
-    gradients: List  # same shape as self.weight, storage for error gradients of weights
-    fanin: List  # same shape as self.activation, storage for the fan in of each neuron
+    gradients: List  # List of (BATCH_SIZE, n + 1, m). Error gradients for each weight
+    fanin: List  # List of (BATCH_SIZE, n) arrays. The linear input for a neuron
 
     _dadw_cache: Dict
     _DADW_cache: Dict
+    _previous_gradients: List
 
     def __init__(self, dlayers: List[int], params: List[int] = None):
         """
@@ -29,17 +30,22 @@ class NeuralNetwork:
         params: Parameters to create_layers, if None, then randoms will be used
         """
         self.dlayers = dlayers
-        self.fanin = [np.zeros(n) for n in [0] + dlayers[1:]]  # weighted sum for neuron
-        self.activations = [np.concatenate((np.zeros(n), [1])) for n in dlayers]
+        self.fanin = [np.zeros((1000, n)) for n in [0] + dlayers[1:]]
+        self.activations = [np.zeros((1000, n + 1)) for n in dlayers]
+        for k in range(len(dlayers)):
+            self.activations[k][:, -1] = 1  # Bias neurons are 1
 
         # Set weights
         params = params if params is not None else self.get_random_params()
         self.weights = self.weights_from_params(params)
 
-        self.gradients = [np.zeros_like(wm) for wm in self.weights]
+        self.gradients = [
+            np.zeros_like((1000, n + 1, m)) for n, m in zip(dlayers, dlayers[1:])
+        ]
 
         self._dadw_cache = {}
         self._DADW_cache = {}
+        self._previous_gradients = [np.zeros_like(wm) for wm in self.weights]
 
     # TODO: Understand and try other initializations as xavier and kaiming
     # see https://towardsdatascience.com/weight-initialization-in-neural-networks-a-journey-from-the-basics-to-kaiming-954fb9b47c79
@@ -86,15 +92,15 @@ class NeuralNetwork:
         self._dadw_cache = {}  # Previous cache invalid for this feedforward
         self._DADW_cache = {}
 
-        self.activations[0][:-1] = ilayer
+        self.activations[0][:, :-1] = ilayer
         for k in range(1, len(self.dlayers)):
             self.fanin[k] = self.activations[k - 1] @ self.weights[k - 1]
-            self.activations[k][:-1] = g(self.fanin[k])
-        return self.activations[-1][:-1].copy()  # Remove bias neuron from result
+            self.activations[k][:, :-1] = g(self.fanin[k])
+        return self.activations[-1][:, :-1].copy()  # Remove bias neuron from result
 
-    def get_error(self, tgt: List[float]):
+    def get_error(self, tgt: np.array):  # (BATCH_SIZE, #L) -> (#L,)
         """Return mean squared error, target tgt has an output-like structure."""
-        return sum((o - e) ** 2 for o, e in zip(self.activations[-1], tgt)) / len(tgt)
+        return ((self.activations[-1][:, :-1] - tgt) ** 2).mean(axis=1)
 
     def dadw(self, l, q, k, i, j) -> float:
         """Return derivative of a^l_q with respect to w^k_ij."""
@@ -165,13 +171,16 @@ class NeuralNetwork:
             return self._DADW_cache[args]
 
         n, m = self.dlayers[k], self.dlayers[k + 1]
-        res = np.zeros((n + 1, m))
+        res = np.zeros((1000, n + 1, m))
         if l == k + 1:
-            res[:, q] = gprime(self.fanin[l][q]) * self.activations[k]
+            derivatives = gprime(self.fanin[l][:, q, np.newaxis])
+            columns = self.activations[k][:]
+            res[:, :, q] = derivatives * columns
         elif l > k + 1:
             for r in range(self.dlayers[l - 1]):
                 res += self.weights[l - 1][r, q] * self.DADW(l - 1, r, k)
-            res *= gprime(self.fanin[l][q])
+            derivatives = gprime(self.fanin[l][:, q, np.newaxis, np.newaxis])
+            res[...] *= derivatives
         else:
             raise Exception("This execution branch should not be reached.")
 
@@ -185,9 +194,11 @@ class NeuralNetwork:
         mseconst = 2 / self.dlayers[L]
         gradients: List = [None for _ in self.weights]
         for k in reversed(range(L)):
-            summation = 0
+            n, m = self.dlayers[k], self.dlayers[k + 1]
+            summation = np.zeros((1000, n + 1, m))
             for q in range(self.dlayers[L]):
-                tgtdiff = self.activations[L][q] - target[q]
+                tgtdiff = self.activations[L][:, q] - target[:, q]
+                tgtdiff = tgtdiff[:, np.newaxis, np.newaxis]
                 ALqk = self.DADW(L, q, k)
                 summation += tgtdiff * ALqk
             gradients[k] = mseconst * summation
@@ -195,34 +206,49 @@ class NeuralNetwork:
 
     def update_weights(self, gradients, lr=100, momentum=0.9):
         """Update weights using stochastic gradient decent."""
-        prev_grads = self.gradients
+        prev_grads = self._previous_gradients
         first_run = not any(gm.any() for gm in prev_grads)
         if first_run:
             momentum = 0
         for wm, gm, pgm in zip(self.weights, gradients, prev_grads):
             wm[...] -= lr * gm * (1 - momentum) + pgm * momentum
-        self.gradients = gradients
+        self._previous_gradients = gradients
+
+    # def batch_eval(self, batch, batch_size, calc_grads=True):
+    #     """Return mean losses and mean gradients (if calc_grads) over a batch.
+
+    #     All batches must be not larger than batch_size.
+    #     """
+    #     batch_losses = np.empty(batch_size)
+    #     batch_gradients: List = [None] * batch_size
+    #     j = 0
+    #     for j, (inputt, target) in enumerate(zip(*batch)):
+    #         self.feedforward(inputt)
+    #         batch_losses[j] = self.get_error(target)
+    #         if calc_grads:
+    #             batch_gradients[j] = self.get_gradients(target)
+
+    #     # Needed for batches smaller than batch_size
+    #     batch_losses = batch_losses[: j + 1]
+    #     batch_gradients = batch_gradients[: j + 1]
+
+    #     batch_loss = batch_losses.mean()
+    #     if calc_grads:
+    #         batch_gradient = [np.mean(grads, axis=0) for grads in zip(*batch_gradients)]
+    #         return batch_loss, batch_gradient
+    #     return batch_loss
 
     def batch_eval(self, batch, batch_size, calc_grads=True):
         """Return mean losses and mean gradients (if calc_grads) over a batch.
 
         All batches must be not larger than batch_size.
         """
-        batch_losses = np.empty(batch_size)
-        batch_gradients: List = [None] * batch_size
-        j = 0
-        for j, (inputt, target) in enumerate(zip(*batch)):
-            self.feedforward(inputt)
-            batch_losses[j] = self.get_error(target)
-            if calc_grads:
-                batch_gradients[j] = self.get_gradients(target)
-
-        # Needed for batches smaller than batch_size
-        batch_losses = batch_losses[: j + 1]
-        batch_gradients = batch_gradients[: j + 1]
-
-        batch_loss = batch_losses.mean()
+        inputs, targets = batch
+        outputs = self.feedforward(inputs)
+        errors = self.get_error(targets)
+        batch_loss = errors.mean()
         if calc_grads:
-            batch_gradient = [np.mean(grads, axis=0) for grads in zip(*batch_gradients)]
-            return batch_loss, batch_gradient
+            gradients = self.get_gradients(targets)
+            batch_gradients = [gms.mean(axis=0) for gms in gradients]
+            return batch_loss, batch_gradients
         return batch_loss
