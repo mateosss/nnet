@@ -14,33 +14,40 @@ gprime = lambda h: g(h) * (1 - g(h))  # g'(in^l_q)
 class NeuralNetwork:
     # Note: under current layer k: read comments as if n, m = dlayers[k], dlayers[k + 1]
     dlayers: List[int]  # Layer description
+    batch_size: int  # Amount of samples to process together
     weights: List  # List of (n + 1, m) arrays (+1 for bias). The synaptic efficacy
-    activations: List  # List of (BATCH_SIZE, n + 1) arrays. The value of a neuron
+    activations: List  # List of (batch_size, n + 1) arrays. The value of a neuron
 
-    gradients: List  # List of (BATCH_SIZE, n + 1, m). Error gradients for each weight
-    fanin: List  # List of (BATCH_SIZE, n) arrays. The linear input for a neuron
+    gradients: List  # List of (batch_size, n + 1, m). Error gradients for each weight
+    fanin: List  # List of (batch_size, n) arrays. The linear input for a neuron
 
     _dadw_cache: Dict
     _DADW_cache: Dict
     _previous_gradients: List
 
-    def __init__(self, dlayers: List[int], batch_size: int, params: List[int] = None):
+    def __init__(
+        self, dlayers: List[int], batch_size: int = 0, params: List[int] = None
+    ):
         """
         dlayers: description of the network layers,
         params: Parameters to create_layers, if None, then randoms will be used
         """
         self.dlayers = dlayers
-        self.fanin = [np.zeros((batch_size, n)) for n in [0] + dlayers[1:]]
-        self.activations = [np.zeros((batch_size, n + 1)) for n in dlayers]
+        self.batch_size = batch_size
+
+        # Set neurons
+        bshape = lambda tup: (batch_size,) + tup if batch_size > 0 else tup
+        self.fanin = [np.zeros(bshape((n,))) for n in [0] + dlayers[1:]]
+        self.activations = [np.zeros(bshape((n + 1,))) for n in dlayers]
         for k in range(len(dlayers)):
-            self.activations[k][:, -1] = 1  # Bias neurons are 1
+            self.activations[k][..., -1] = 1  # Bias neurons are 1
 
         # Set weights
         params = params if params is not None else self.get_random_params()
         self.weights = self.weights_from_params(params)
 
         self.gradients = [
-            np.zeros((batch_size, n + 1, m)) for n, m in zip(dlayers, dlayers[1:])
+            np.zeros(bshape((n + 1, m))) for n, m in zip(dlayers, dlayers[1:])
         ]
 
         self._dadw_cache = {}
@@ -67,6 +74,10 @@ class NeuralNetwork:
         """Return parameter list that can be used to recreate this network."""
         return np.array([w for m in self.weights for r in m for w in r])
 
+    @property
+    def is_batched(self) -> bool:
+        return self.batch_size != 0
+
     def weights_from_params(self, params) -> List[np.array]:
         """Map the flat params iterable to a proper weight matrix.
 
@@ -92,15 +103,16 @@ class NeuralNetwork:
         self._dadw_cache = {}  # Previous cache invalid for this feedforward
         self._DADW_cache = {}
 
-        self.activations[0][:, :-1] = ilayer
+        self.activations[0][..., :-1] = ilayer
         for k in range(1, len(self.dlayers)):
             self.fanin[k] = self.activations[k - 1] @ self.weights[k - 1]
-            self.activations[k][:, :-1] = g(self.fanin[k])
-        return self.activations[-1][:, :-1].copy()  # Remove bias neuron from result
+            self.activations[k][..., :-1] = g(self.fanin[k])
+        return self.activations[-1][..., :-1].copy()  # Remove bias neuron from result
 
-    def get_error(self, tgt: np.array):  # (BATCH_SIZE, #L) -> (#L,)
+    def get_error(self, tgt: np.array):  # (batch_size, #L) -> (#L,)
         """Return mean squared error, target tgt has an output-like structure."""
-        return ((self.activations[-1][:, :-1] - tgt) ** 2).mean(axis=1)
+        axis = 1 if self.is_batched else 0
+        return ((self.activations[-1][..., :-1] - tgt) ** 2).mean(axis)
 
     def dadw(self, l, q, k, i, j) -> float:
         """Return derivative of a^l_q with respect to w^k_ij."""
@@ -170,15 +182,15 @@ class NeuralNetwork:
         if args in self._DADW_cache:
             return self._DADW_cache[args]
 
-        res = np.zeros_like(self.gradients[k])  # (BATCH_SIZE, n + 1, m)
+        res = np.zeros_like(self.gradients[k])  # (batch_size, n + 1, m)
         if l == k + 1:
-            derivatives = gprime(self.fanin[l][:, q, np.newaxis])
+            derivatives = gprime(self.fanin[l][..., q, np.newaxis])
             columns = self.activations[k][:]
-            res[:, :, q] = derivatives * columns
+            res[..., :, q] = derivatives * columns
         elif l > k + 1:
             for r in range(self.dlayers[l - 1]):
                 res += self.weights[l - 1][r, q] * self.DADW(l - 1, r, k)
-            derivatives = gprime(self.fanin[l][:, q, np.newaxis, np.newaxis])
+            derivatives = gprime(self.fanin[l][..., q, np.newaxis, np.newaxis])
             res[...] *= derivatives
         else:
             raise Exception("This execution branch should not be reached.")
@@ -193,10 +205,10 @@ class NeuralNetwork:
         mseconst = 2 / self.dlayers[L]
         gradients: List = [None for _ in self.weights]
         for k in reversed(range(L)):
-            summation = np.zeros_like(self.gradients[k])  # (BATCH_SIZE, n + 1, m)
+            summation = np.zeros_like(self.gradients[k])  # (batch_size, n + 1, m)
             for q in range(self.dlayers[L]):
-                tgtdiff = self.activations[L][:, q] - target[:, q]
-                tgtdiff = tgtdiff[:, np.newaxis, np.newaxis]
+                tgtdiff = self.activations[L][..., q] - target[..., q]
+                tgtdiff = tgtdiff[..., np.newaxis, np.newaxis]
                 ALqk = self.DADW(L, q, k)
                 summation += tgtdiff * ALqk
             gradients[k] = mseconst * summation

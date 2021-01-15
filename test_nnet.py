@@ -19,8 +19,8 @@ COMPLETENESS = 0.05  # ratio of loops that will be effectively tested
 
 SAMPLE = mnist.read()
 IMAGE, LABEL = next(SAMPLE)  # the one image used for testing
-INPUT = [pixel / 255 for row in IMAGE for pixel in row]
-TARGET = [1 if i == LABEL else 0 for i in range(10)]
+INPUT = np.array([pixel / 255 for row in IMAGE for pixel in row])
+TARGET = np.array([1 if i == LABEL else 0 for i in range(10)])
 
 
 @dataclass
