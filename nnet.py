@@ -40,7 +40,7 @@ class NeuralNetwork:
         self.weights = self.weights_from_params(params)
 
         self.gradients = [
-            np.zeros_like((1000, n + 1, m)) for n, m in zip(dlayers, dlayers[1:])
+            np.zeros((1000, n + 1, m)) for n, m in zip(dlayers, dlayers[1:])
         ]
 
         self._dadw_cache = {}
