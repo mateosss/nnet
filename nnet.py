@@ -185,10 +185,12 @@ class NeuralNetwork:
         mseconst = 2 / self.dlayers[L]
         gradients: List = [None for _ in self.weights]
         for k in reversed(range(L)):
-            gradients[k] = mseconst * sum(
-                (self.activations[L][q] - target[q]) * self.DADW(L, q, k)
-                for q in range(self.dlayers[L])
-            )
+            summation = 0
+            for q in range(self.dlayers[L]):
+                tgtdiff = self.activations[L][q] - target[q]
+                ALqk = self.DADW(L, q, k)
+                summation += tgtdiff * ALqk
+            gradients[k] = mseconst * summation
         return gradients
 
     def update_weights(self, gradients, lr=100, momentum=0.9):
