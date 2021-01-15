@@ -12,7 +12,7 @@ gprime = lambda h: g(h) * (1 - g(h))  # g'(in^l_q)
 
 
 class NeuralNetwork:
-    # n and m will refer to the size of current and next layer in comments
+    # Note: under current layer k: read comments as if n, m = dlayers[k], dlayers[k + 1]
     dlayers: List[int]  # Layer description
     weights: List  # List of (n + 1, m) arrays (+1 for bias). The synaptic efficacy
     activations: List  # List of (BATCH_SIZE, n + 1) arrays. The value of a neuron
@@ -24,14 +24,14 @@ class NeuralNetwork:
     _DADW_cache: Dict
     _previous_gradients: List
 
-    def __init__(self, dlayers: List[int], params: List[int] = None):
+    def __init__(self, dlayers: List[int], batch_size: int, params: List[int] = None):
         """
         dlayers: description of the network layers,
         params: Parameters to create_layers, if None, then randoms will be used
         """
         self.dlayers = dlayers
-        self.fanin = [np.zeros((1000, n)) for n in [0] + dlayers[1:]]
-        self.activations = [np.zeros((1000, n + 1)) for n in dlayers]
+        self.fanin = [np.zeros((batch_size, n)) for n in [0] + dlayers[1:]]
+        self.activations = [np.zeros((batch_size, n + 1)) for n in dlayers]
         for k in range(len(dlayers)):
             self.activations[k][:, -1] = 1  # Bias neurons are 1
 
@@ -40,7 +40,7 @@ class NeuralNetwork:
         self.weights = self.weights_from_params(params)
 
         self.gradients = [
-            np.zeros((1000, n + 1, m)) for n, m in zip(dlayers, dlayers[1:])
+            np.zeros((batch_size, n + 1, m)) for n, m in zip(dlayers, dlayers[1:])
         ]
 
         self._dadw_cache = {}
@@ -170,8 +170,7 @@ class NeuralNetwork:
         if args in self._DADW_cache:
             return self._DADW_cache[args]
 
-        n, m = self.dlayers[k], self.dlayers[k + 1]
-        res = np.zeros((1000, n + 1, m))
+        res = np.zeros_like(self.gradients[k])  # (BATCH_SIZE, n + 1, m)
         if l == k + 1:
             derivatives = gprime(self.fanin[l][:, q, np.newaxis])
             columns = self.activations[k][:]
@@ -194,8 +193,7 @@ class NeuralNetwork:
         mseconst = 2 / self.dlayers[L]
         gradients: List = [None for _ in self.weights]
         for k in reversed(range(L)):
-            n, m = self.dlayers[k], self.dlayers[k + 1]
-            summation = np.zeros((1000, n + 1, m))
+            summation = np.zeros_like(self.gradients[k])  # (BATCH_SIZE, n + 1, m)
             for q in range(self.dlayers[L]):
                 tgtdiff = self.activations[L][:, q] - target[:, q]
                 tgtdiff = tgtdiff[:, np.newaxis, np.newaxis]

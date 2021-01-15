@@ -114,7 +114,7 @@ def dataset(dataset_type="training") -> Iterator[Tuple]:
 
 
 def main():
-    net = NeuralNetwork(DLAYERS)
+    net = NeuralNetwork(DLAYERS, BATCH_SIZE)
     trainbatches = list(dataset("training"))
     testbatches = list(dataset("testing"))
     print(">>> datasets initialized")
