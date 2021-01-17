@@ -203,6 +203,31 @@ class NeuralNetwork:
         self._DADW_cache[args] = res
         return res
 
+    def out_DADW(self, l, q, k, out: List, rest: List[List]) -> None:
+        outs_exhausted = len(rest) == 0
+        res = out[k]  # (batch_size, n + 1, m)
+        res.fill(0)
+        tmp0 = rest[0]
+        tmp = tmp0[k]
+        rest = rest[1:]
+        if l == k + 1:
+            derivatives = gprime(self.fanin[l][..., q, np.newaxis])
+            columns = self.activations[k][:]
+            res[..., :, q] = derivatives * columns
+        elif l > k + 1 and outs_exhausted:
+            raise Exception("Should not happen")
+        elif l > k + 1 and not outs_exhausted:
+            for r in range(self.dlayers[l - 1]):
+                # lap(f">>> l > k + 1 => {r=}")
+                self.out_DADW(l - 1, r, k, out=tmp0, rest=rest) # will fill tmp with result
+                w = self.weights[l - 1][r, q]
+                np.multiply(tmp, w, out=tmp)
+                np.add(res, tmp, out=res)
+            derivatives = gprime(self.fanin[l][..., q, np.newaxis, np.newaxis])
+            np.multiply(res, derivatives, out=res)
+        else:
+            raise Exception("This execution branch should not be reached.")
+
     def get_gradients(self, target: np.array) -> List[np.array]:
         """Matrix of each error gradient ∇E^k_{i, j} using DADW() matrices."""
         L = len(self.dlayers) - 1  # Last layer index
@@ -218,6 +243,39 @@ class NeuralNetwork:
                 summation += tgtdiff * ALqk
             gradients[k] = mseconst * summation
         return gradients
+
+    def get_batch_gradients(self, target: np.array) -> List[np.array]:
+        """Matrix of each error gradient ∇E^k_{i, j} using DADW() matrices."""
+        L = len(self.dlayers) - 1  # Last layer index
+        mseconst = 2 / self.dlayers[L]
+        batch_gradients = [np.zeros_like(wm) for wm in self.weights]
+        aux_sum = [np.zeros_like(gm) for gm in self.gradients]
+        gradients = [np.zeros_like(gm) for gm in self.gradients]
+        aux_diff = np.zeros(self.batch_size)
+
+        ALq = [np.zeros_like(gm) for gm in self.gradients]
+        aux1 = [np.zeros_like(gm) for gm in self.gradients]
+        aux2 = [np.zeros_like(gm) for gm in self.gradients]
+        aux3 = [np.zeros_like(gm) for gm in self.gradients]
+        rest = [aux1, aux2, aux2]
+
+        for k in reversed(range(L)):
+            summation = aux_sum[k] # (batch_size, n + 1, m)
+            summation.fill(0)
+            ALqk = ALq[k]
+            for q in range(self.dlayers[L]):
+                lap(f">>> get_gradients {q=}")
+                tgtdiff = aux_diff # (batch_size, )
+                np.subtract(self.activations[L][..., q], target[..., q], out=tgtdiff)
+                tgtdiff = tgtdiff[..., np.newaxis, np.newaxis]
+                self.out_DADW(L, q, k, ALq, rest)
+                np.multiply(tgtdiff, ALqk, out=ALqk)
+                np.add(summation, ALqk, out=summation)
+            np.multiply(summation, mseconst, out=gradients[k])
+        batch_gradients = [gms.mean(axis=0) for gms in gradients]
+        return batch_gradients
+
+
 
     def update_weights(self, gradients, lr=100, momentum=0.9):
         """Update weights using stochastic gradient decent."""
@@ -263,7 +321,8 @@ class NeuralNetwork:
         errors = self.get_error(targets)
         batch_loss = errors.mean()
         if calc_grads:
-            gradients = self.get_gradients(targets)
-            batch_gradients = [gms.mean(axis=0) for gms in gradients]
+            batch_gradients = self.get_batch_gradients(targets)
+            # gradients = self.get_gradients(targets)
+            # batch_gradients = [gms.mean(axis=0) for gms in gradients]
             return batch_loss, batch_gradients
         return batch_loss
