@@ -1,3 +1,6 @@
+import time
+from lap import lap
+
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
@@ -189,6 +192,7 @@ class NeuralNetwork:
             res[..., :, q] = derivatives * columns
         elif l > k + 1:
             for r in range(self.dlayers[l - 1]):
+                # lap(f">>> l > k + 1 => {r=}")
                 res += self.weights[l - 1][r, q] * self.DADW(l - 1, r, k)
             derivatives = gprime(self.fanin[l][..., q, np.newaxis, np.newaxis])
             res[...] *= derivatives
@@ -207,6 +211,7 @@ class NeuralNetwork:
         for k in reversed(range(L)):
             summation = np.zeros_like(self.gradients[k])  # (batch_size, n + 1, m)
             for q in range(self.dlayers[L]):
+                lap(f">>> get_gradients {q=}")
                 tgtdiff = self.activations[L][..., q] - target[..., q]
                 tgtdiff = tgtdiff[..., np.newaxis, np.newaxis]
                 ALqk = self.DADW(L, q, k)

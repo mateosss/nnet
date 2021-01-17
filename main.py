@@ -1,5 +1,7 @@
 "Main user of nnet module"
 
+from lap import lap
+
 import itertools as it
 from time import time
 from typing import Iterator, Tuple
@@ -63,13 +65,13 @@ def train_epoch(trainbatches, net: NeuralNetwork, epoch):
     log_loss = 0
     log_time = time()
     for i, batch in enumerate(trainbatches):
-        print(f">>> evaluating batch {i=}")
+        lap(f">>> evaluating batch {i=}")
         loss, gradients = net.batch_eval(batch, BATCH_SIZE)
-        print(f">>> updating weights")
+        lap(f">>> updating weights")
         net.update_weights(gradients)
 
         # Assert improved loss
-        print(f">>> asserting improvement")
+        lap(f">>> asserting improvement")
         new_loss = net.batch_eval(batch, BATCH_SIZE, calc_grads=False)
         if new_loss > loss:
             print(f"[W] loss increased by {100 * (new_loss - loss) / loss:.2f}%")
@@ -80,7 +82,7 @@ def train_epoch(trainbatches, net: NeuralNetwork, epoch):
                 f"[TR] [{epoch + 1}, {(i + 1) * BATCH_SIZE}] [{time() - log_time:.2f}s] "
                 f"avgloss: {log_loss / LOG_FREQ:.3f}"
             )
-            print(f">>> {loss=}")
+            lap(f">>> {loss=}")
             log_time = time()
             log_loss = 0
 
@@ -88,9 +90,9 @@ def train_epoch(trainbatches, net: NeuralNetwork, epoch):
 def train(net: NeuralNetwork, trainbatches, testbatches):
     itime = time()
     for epoch in range(EPOCHS):
-        print(f">>> start {epoch=} train")
+        lap(f">>> start {epoch=} train")
         train_epoch(trainbatches, net, epoch)
-        print(f">>> start {epoch=} test")
+        lap(f">>> start {epoch=} test")
         test(trainbatches, testbatches, net, epoch)
     print(f"[FINISH] Training finished in {time() - itime:.2f}s.")
 
@@ -117,7 +119,7 @@ def main():
     net = NeuralNetwork(DLAYERS, BATCH_SIZE)
     trainbatches = list(dataset("training"))
     testbatches = list(dataset("testing"))
-    print(">>> datasets initialized")
+    lap(">>> datasets initialized")
     train(net, trainbatches, testbatches)
 
 
