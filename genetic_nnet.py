@@ -8,7 +8,7 @@ from genetics import Subject, GeneticAlgorithm
 
 class GANeuralNetwork(Subject, NeuralNetwork):
 
-    __mnist_db = list(mnist.read())
+    # __mnist_db = list(mnist.read()) TODO: Uncomment and make this work again
 
     _genome: List[float]
     _fitness: float

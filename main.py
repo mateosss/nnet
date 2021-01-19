@@ -1,8 +1,6 @@
 "Main user of nnet module"
 
-import itertools as it
 from time import time
-from typing import Iterator, Tuple
 
 import numpy as np
 
@@ -95,28 +93,10 @@ def train(net: NeuralNetwork, trainbatches, testbatches):
     print(f"[FINISH] Training finished in {time() - itime:.2f}s.")
 
 
-def dataset(dataset_type="training") -> Iterator[Tuple]:
-    """Return an iterator of batches.
-
-    A batch structure is as follows:
-    (ndarray of BATCH_SIZEx784 float64's, ndarray of BATCH_SIZE uint8's)
-    dataset_type = training | testing
-    """
-    data = mnist.read(dataset_type)
-    while True:
-        pair_imglbl = tuple(zip(*it.islice(data, BATCH_SIZE)))
-        if not pair_imglbl:
-            return
-        images, labels = pair_imglbl
-        images = np.array(images).reshape(BATCH_SIZE, 28 * 28) / 255
-        labels = np.array([[1 if q == l else 0 for q in range(10)] for l in labels])
-        yield images, labels
-
-
 def main():
     net = NeuralNetwork(DLAYERS, BATCH_SIZE)
-    trainbatches = list(dataset("training"))
-    testbatches = list(dataset("testing"))
+    trainbatches = mnist.load("training", BATCH_SIZE)
+    testbatches = mnist.load("testing", BATCH_SIZE)
     print(">>> datasets initialized")
     train(net, trainbatches, testbatches)
 
