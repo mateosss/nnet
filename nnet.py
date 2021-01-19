@@ -1,15 +1,29 @@
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Union
+from functools import partial
 
-import numpy as np
+import numpy as _np
 from numpy.random import randn
 
-np.random.seed(1)
+_np.random.seed(1)
+
+# Use float32 everywhere
+Array = Union[_np.ndarray]
+AXIS = _np.newaxis
+array = partial(_np.array, dtype=_np.float32)
+empty = partial(_np.empty, dtype=_np.float32)
+mean = partial(_np.mean, dtype=_np.float32)
+zeros = partial(_np.zeros, dtype=_np.float32)
+zeros_like = partial(_np.zeros_like, dtype=_np.float32)
+concatenate = _np.concatenate
+cumsum = _np.cumsum
+sqrt = partial(_np.sqrt, dtype=_np.float32)
+exp = partial(_np.exp, dtype=_np.float32)
+randn = lambda *a, **kw: _np.random.standard_normal(*a, **kw).astype(_np.float32)
 
 # TODO: Try more activation functions as ReLU and others
 # TODO: Move activation function inside class
-g = lambda x: 1 / (1 + np.exp(-x))  # Activation function
+g = lambda x: 1 / (1 + exp(-x))  # Activation function
 gprime = lambda h: g(h) * (1 - g(h))  # g'(in^l_q)
-
 
 class NeuralNetwork:
     # n and m will refer to the size of current and next layer in comments
@@ -29,14 +43,14 @@ class NeuralNetwork:
         params: Parameters to create_layers, if None, then randoms will be used
         """
         self.dlayers = dlayers
-        self.fanin = [np.zeros(n) for n in [0] + dlayers[1:]]  # weighted sum for neuron
-        self.activations = [np.concatenate((np.zeros(n), [1])) for n in dlayers]
+        self.fanin = [zeros(n) for n in [0] + dlayers[1:]]  # weighted sum for neuron
+        self.activations = [concatenate((zeros(n), [1])) for n in dlayers]
 
         # Set weights
         params = params if params is not None else self.get_random_params()
         self.weights = self.weights_from_params(params)
 
-        self.gradients = [np.zeros_like(wm) for wm in self.weights]
+        self.gradients = [zeros_like(wm) for wm in self.weights]
 
         self._dadw_cache = {}
         self._DADW_cache = {}
@@ -48,9 +62,9 @@ class NeuralNetwork:
         # i / n to scale the sum result based on number of input weights
         # seems to make outputs stable
         # TODO: Should biases be initialized differently?
-        return np.array(
+        return array(
             [
-                i / np.sqrt(n + 1)
+                i / sqrt(n + 1)
                 for n, m in zip(self.dlayers, self.dlayers[1:])
                 for i in randn((n + 1) * m)
             ]
@@ -59,9 +73,9 @@ class NeuralNetwork:
     @property
     def params(self):
         """Return parameter list that can be used to recreate this network."""
-        return np.array([w for m in self.weights for r in m for w in r])
+        return array([w for m in self.weights for r in m for w in r])
 
-    def weights_from_params(self, params) -> List[np.array]:
+    def weights_from_params(self, params) -> List[Array]:
         """Map the flat params iterable to a proper weight matrix.
 
         params: Flat list of weights w^k_{i, j} from neuron i in layer k to j in k + 1
@@ -70,14 +84,14 @@ class NeuralNetwork:
         l = len(self.dlayers) - 1  # amount of weight matrices
         weights = [None] * l
         wsizes = [(n + 1) * m for n, m in zip(self.dlayers, self.dlayers[1:])]
-        offset_layer = np.concatenate([[0], np.cumsum(wsizes)])
+        offset_layer = concatenate([[0], cumsum(wsizes)])
         for k in range(l):
             n = self.dlayers[k] + 1  # Neurons in current layer
             m = self.dlayers[k + 1]  # Neurons in next layer
             weights[k] = params[offset_layer[k] : offset_layer[k + 1]].reshape((n, m))
         return weights
 
-    def feedforward(self, ilayer) -> np.array:
+    def feedforward(self, ilayer) -> Array:
         """Forward propagation of the network, fill activation vectors.
 
         ilayer: Normalized input layer scaled in range [0, 1]
@@ -142,11 +156,11 @@ class NeuralNetwork:
         self._dadw_cache[args] = res
         return res
 
-    def get_gradients_slow(self, target) -> List[np.array]:
+    def get_gradients_slow(self, target) -> List[Array]:
         """Matrix of each error gradient ∇E^k_{i, j} using dadw()."""
         L = len(self.dlayers) - 1  # Last layer index
         mseconst = 2 / self.dlayers[-1]
-        gradients = [np.zeros_like(wm) for wm in self.weights]
+        gradients = [zeros_like(wm) for wm in self.weights]
 
         for k in reversed(range(L)):
             n, m = self.dlayers[k], self.dlayers[k + 1]
@@ -165,7 +179,7 @@ class NeuralNetwork:
             return self._DADW_cache[args]
 
         n, m = self.dlayers[k], self.dlayers[k + 1]
-        res = np.zeros((n + 1, m))
+        res = zeros((n + 1, m))
         if l == k + 1:
             res[:, q] = gprime(self.fanin[l][q]) * self.activations[k]
         elif l > k + 1:
@@ -179,7 +193,7 @@ class NeuralNetwork:
         self._DADW_cache[args] = res
         return res
 
-    def get_gradients(self, target: np.array) -> List[np.array]:
+    def get_gradients(self, target: Array) -> List[Array]:
         """Matrix of each error gradient ∇E^k_{i, j} using DADW() matrices."""
         L = len(self.dlayers) - 1  # Last layer index
         mseconst = 2 / self.dlayers[L]
@@ -208,7 +222,7 @@ class NeuralNetwork:
 
         All batches must be not larger than batch_size.
         """
-        batch_losses = np.empty(batch_size)
+        batch_losses = empty(batch_size)
         batch_gradients: List = [None] * batch_size
         j = 0
         for j, (inputt, target) in enumerate(zip(*batch)):
@@ -223,6 +237,6 @@ class NeuralNetwork:
 
         batch_loss = batch_losses.mean()
         if calc_grads:
-            batch_gradient = [np.mean(grads, axis=0) for grads in zip(*batch_gradients)]
+            batch_gradient = [mean(grads, axis=0) for grads in zip(*batch_gradients)]
             return batch_loss, batch_gradient
         return batch_loss
