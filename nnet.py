@@ -1,6 +1,11 @@
-from typing import Dict, List, Union
 from functools import partial
+from typing import Dict, List, Union
+
 import numpy as _np  # not as np as we don't want the code getting float64
+
+import pyximport
+pyximport.install(inplace=True, language_level=3)
+import dadw
 
 _np.random.seed(1)
 
@@ -188,32 +193,35 @@ class NeuralNetwork:
         return gradients
 
     def DADW(self, l, q, k):
-        """Read only matrix A^{l, q}_k of each derivative of dadw(i, j)."""
-        args = (l, q, k)
-        if args in self._DADW_cache:
-            return self._DADW_cache[args]
+        return dadw.DADW(self, l, q, k)
 
-        res = zeros_like(self.gradients[k])  # (batch_size, n + 1, m)
-        if l == k + 1:
-            derivatives = gprime(self.fanin[l][..., q, AXIS])
-            columns = self.activations[k][:]
-            res[..., :, q] = derivatives * columns
-        elif l > k + 1:
-            for r in range(self.dlayers[l - 1]):
-                res += self.weights[l - 1][r, q] * self.DADW(l - 1, r, k)
-            derivatives = gprime(self.fanin[l][..., q, AXIS, AXIS])
-            res[...] *= derivatives
-            # for r in range(self.dlayers[l - 1]):
-            #     mul = self.weights[l - 1][r, q] * self.DADW(l - 1, r, k)
-            #     np.add(res, mul, out=res)
-            # derivatives = gprime(self.fanin[l][..., q, AXIS, AXIS])
-            # np.multiply(res, derivatives, out=res)
-        else:
-            raise Exception("This execution branch should not be reached.")
+    # def DADW(self, l, q, k):
+    #     """Read only matrix A^{l, q}_k of each derivative of dadw(i, j)."""
+    #     args = (l, q, k)
+    #     if args in self._DADW_cache:
+    #         return self._DADW_cache[args]
 
-        res.setflags(write=False)  # As the result is cached, we make it readonly
-        self._DADW_cache[args] = res
-        return res
+    #     res = zeros_like(self.gradients[k])  # (batch_size, n + 1, m)
+    #     if l == k + 1:
+    #         derivatives = gprime(self.fanin[l][..., q, AXIS])
+    #         columns = self.activations[k][:]
+    #         res[..., :, q] = derivatives * columns
+    #     elif l > k + 1:
+    #         for r in range(self.dlayers[l - 1]):
+    #             res += self.weights[l - 1][r, q] * self.DADW(l - 1, r, k)
+    #         derivatives = gprime(self.fanin[l][..., q, AXIS, AXIS])
+    #         res[...] *= derivatives
+    #         # for r in range(self.dlayers[l - 1]):
+    #         #     mul = self.weights[l - 1][r, q] * self.DADW(l - 1, r, k)
+    #         #     np.add(res, mul, out=res)
+    #         # derivatives = gprime(self.fanin[l][..., q, AXIS, AXIS])
+    #         # np.multiply(res, derivatives, out=res)
+    #     else:
+    #         raise Exception("This execution branch should not be reached.")
+
+    #     res.setflags(write=False)  # As the result is cached, we make it readonly
+    #     self._DADW_cache[args] = res
+    #     return res
 
     def get_gradients(self, target: Array) -> List[Array]:
         """Matrix of each error gradient ∇E^k_{i, j} using DADW() matrices."""
