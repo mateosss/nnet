@@ -35,10 +35,12 @@ cpdef DADW(self, size_t l, size_t q, size_t k):
 
     cdef const float[:, ::1] weights = self.weights[l - 1]
     cdef const float[:, ::1] fanins = self.fanin[l]
+    cdef const float[:, ::1] fanins_prev = self.fanin[l - 1]
     cdef const float[:, ::1] activations = self.activations[k]
 
     cdef size_t b, i, j
     cdef float _fanin, derivative, activation
+    cdef float fanin_prev, derivative_prev
     cdef float w
     cdef const float[:, :, :] prev_A
 
@@ -58,6 +60,18 @@ cpdef DADW(self, size_t l, size_t q, size_t k):
                 derivative = _gprime(_fanin)
                 activation = activations[b, i]
                 _res[b, i, q] = derivative * activation
+    elif l == k + 2:
+        # for b in range(BATCH_SIZE):
+        for b in prange(BATCH_SIZE, nogil=True):
+            _fanin = fanins[b, q]
+            derivative = _gprime(_fanin)
+            for i in range(n + 1):
+                activation = activations[b, i]
+                for j in range(m):
+                    fanin_prev = fanins_prev[b, j]
+                    derivative_prev = _gprime(fanin_prev)
+                    w = weights[j, q]
+                    _res[b, i, j] = derivative * w * derivative_prev * activation
     elif l > k + 1:
         for r in range(prev_l_sz):
             prev_A = DADW(self, l - 1, r, k)
