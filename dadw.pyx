@@ -113,7 +113,6 @@ cdef void DADW_pre(
                 fanin_prev = fanins_prev[b, j]
                 derivative_prev = _gprime(fanin_prev)
                 w = weights[j, q]
-                cache[q, ]
                 cache[q, b, i, j] = derivative * w * derivative_prev * activation
 
 def DADW_prepopulate(self):
