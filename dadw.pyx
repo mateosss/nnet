@@ -18,8 +18,6 @@ cdef float _g(float x) nogil:
 cdef float _gprime(float h) nogil:
     return _g(h) * (1 - _g(h))
 
-# @cython.boundscheck(False)  # Deactivate bounds checking
-# @cython.wraparound(False)  # Deactivate negative indexing.
 cpdef DADW(self, size_t l, size_t q, size_t k):
     """Read only matrix A^{l, q}_k of each derivative of dadw(i, j)."""
     args = (l, q, k)
@@ -39,32 +37,24 @@ cpdef DADW(self, size_t l, size_t q, size_t k):
     cdef const float[:, ::1] activations = self.activations[k]
 
     cdef size_t b, i, j
-    cdef float _fanin, derivative, activation
+    cdef float fanin, derivative, activation
     cdef float fanin_prev, derivative_prev
     cdef float w
     cdef const float[:, :, :] prev_A
 
-
-
-
-    # if l == k + 1:
-    #     fanin = self.fanin[l][0:BATCH_SIZE, q, AXIS]
-    #     derivatives = gprime(fanin)
-    #     columns = self.activations[k][:]
-    #     res[..., :, q] = derivatives * columns
     if l == k + 1:
         # for b in range(BATCH_SIZE):
         for b in prange(BATCH_SIZE, nogil=True):
+            fanin = fanins[b, q]
+            derivative = _gprime(fanin)
             for i in range(n + 1):
-                _fanin = fanins[b, q]
-                derivative = _gprime(_fanin)
                 activation = activations[b, i]
                 _res[b, i, q] = derivative * activation
     elif l == k + 2:
         # for b in range(BATCH_SIZE):
         for b in prange(BATCH_SIZE, nogil=True):
-            _fanin = fanins[b, q]
-            derivative = _gprime(_fanin)
+            fanin = fanins[b, q]
+            derivative = _gprime(fanin)
             for i in range(n + 1):
                 activation = activations[b, i]
                 for j in range(m):
@@ -81,24 +71,14 @@ cpdef DADW(self, size_t l, size_t q, size_t k):
                 for i in range(n + 1):
                     for j in range(m):
                         _res[b, i, j] += w * prev_A[b, i, j]
-        _fanin = fanins[b, q]
-        derivative = _gprime(_fanin)
         for b in range(BATCH_SIZE):
+            fanin = fanins[b, q]
+            derivative = _gprime(fanin)
             for i in range(n + 1):
                 for j in range(m):
                     _res[b, i, j] *= derivative
-
-    # elif l > k + 1:
-    #     for r in range(self.dlayers[l - 1]):
-    #         res += self.weights[l - 1][r, q] * self.DADW(l - 1, r, k)
-    #     fanin = self.fanin[l][0:BATCH_SIZE, q, AXIS, AXIS]
-    #     derivatives = gprime(fanin)
-    #     res[...] *= derivatives
     else:
         raise Exception("This execution branch should not be reached.")
-
-
-
 
     res.setflags(write=False)  # As the result is cached, we make it readonly
     self._DADW_cache[args] = res
