@@ -1,7 +1,8 @@
+profile = lambda f: f
+
 "Main user of nnet module"
 
 from time import time
-
 import numpy as np
 
 import mnist
@@ -57,6 +58,7 @@ def test(trainbatches, testbatches, net: NeuralNetwork, epoch):
     )
 
 
+@profile
 def train_epoch(trainbatches, net: NeuralNetwork, epoch):
     log_loss = 0
     log_time = time()
@@ -79,6 +81,7 @@ def train_epoch(trainbatches, net: NeuralNetwork, epoch):
                 f"avgloss: {log_loss / LOG_FREQ:.3f}"
             )
             print(f">>> {loss=}")
+            # exit()
             log_time = time()
             log_loss = 0
 

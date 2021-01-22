@@ -1,3 +1,6 @@
+profile = lambda f: f
+
+
 from functools import partial
 from typing import Dict, List, Union
 
@@ -192,8 +195,25 @@ class NeuralNetwork:
                     )
         return gradients
 
+    @profile
     def DADW(self, l, q, k):
         return dadw.DADW(self, l, q, k)
+
+    @profile
+    def DADW_prepopulate(self):
+        return dadw.DADW_prepopulate(self)
+
+    # @profile
+    # def DADW(self, l, q, k):
+    #     args = (l, q, k)
+    #     print(args, end="")
+    #     if args in self._DADW_cache:
+    #         print("HIT")
+    #         return self._DADW_cache[args]
+    #     print("MISS")
+
+    #     return dadw.DADW(self, l, q, k)
+
 
     # def DADW(self, l, q, k):
     #     """Read only matrix A^{l, q}_k of each derivative of dadw(i, j)."""
@@ -223,8 +243,14 @@ class NeuralNetwork:
     #     self._DADW_cache[args] = res
     #     return res
 
+    @profile
     def get_gradients(self, target: Array) -> List[Array]:
         """Matrix of each error gradient ∇E^k_{i, j} using DADW() matrices."""
+        cache = self.DADW_prepopulate()
+        for q in range(16):
+            self._DADW_cache[(2, q, 0)] = cache[q]
+
+
         L = len(self.dlayers) - 1  # Last layer index
         mseconst = 2 / self.dlayers[L]
         gradients: List = [None for _ in self.weights]
@@ -272,6 +298,7 @@ class NeuralNetwork:
     #         return batch_loss, batch_gradient
     #     return batch_loss
 
+    @profile
     def batch_eval(self, batch, batch_size, calc_grads=True):
         """Return mean losses and mean gradients (if calc_grads) over a batch.
 
