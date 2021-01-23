@@ -41,7 +41,7 @@ cpdef DADW(self, size_t l, size_t q, size_t k):
     cdef float fanin, derivative, activation
     cdef float fanin_prev, derivative_prev
     cdef float w
-    cdef const float[:, :, :] prev_A
+    cdef const float[:, :, ::1] prev_A
 
     if l == k + 1:
         # for b in range(BATCH_SIZE):
@@ -101,7 +101,7 @@ cdef void DADW_pre(
     cdef float fanin, derivative, activation
     cdef float fanin_prev, derivative_prev
     cdef float w
-    cdef const float[:, :, :] prev_A
+    cdef const float[:, :, ::1] prev_A
 
     # if l == k + 2:
     for b in range(BATCH_SIZE):
