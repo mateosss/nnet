@@ -2,13 +2,18 @@
 # distutils: extra_link_args=-fopenmp
 # cython: language_level=3, boundscheck=False, wraparound=False
 
+import os
 import numpy as _np  # not as np as we don't want the code getting float64
-from functools import partial
+
+from cython.parallel import prange
+
 cimport cython
 from libc.math cimport exp
-from cython.parallel import prange
-from cython.parallel import parallel, threadid
+
 cdef size_t BATCH_SIZE = 1000
+
+assert os.getenv("OMP_NUM_THREADS"), "Unset OMP_NUM_THREADS envvar"
+cdef size_t OMP_NUM_THREADS = int(os.getenv("OMP_NUM_THREADS"))
 
 DTYPE = _np.float32
 AXIS = _np.newaxis
@@ -156,12 +161,13 @@ def DADW_prepopulate(self):
     cdef size_t l = 2
     cdef size_t q
     cdef size_t k = 0
-    cdef size_t num_threads = 4 # TODO: Get this number from OMP_NUM_THREADS envvar
 
     cdef float[:, :, :, ::1] cache = _np.zeros((16, 1000, 785, 16), dtype=DTYPE)
     cdef size_t n = self.dlayers[k]
     cdef size_t m = self.dlayers[k + 1]
     cdef size_t prev_l_sz = self.dlayers[l - 1]
+
+    cdef size_t num_threads = min(OMP_NUM_THREADS, m)
 
     if m % num_threads != 0:
         print(f"[W] m={m} % num_threads={num_threads} != 0, some threads will remain idle while others work")
