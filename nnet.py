@@ -238,6 +238,8 @@ class NeuralNetwork:
 
     def np_get_gradients(self, target: Array) -> List[Array]:
         """Matrix of each error gradient ∇E^k_{i, j} using DADW() matrices."""
+
+        # Prefill cache, improves performance, unnecessary for correctness
         cache = self.cy_DADW_prepopulate()
         for q in range(16):
             self._DADW_cache[(2, q, 0)] = cache[q]

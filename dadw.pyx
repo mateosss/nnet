@@ -137,6 +137,7 @@ cdef void DADW_pre(
     const float[:, ::1] fanins_prev,
     const float[:, ::1] activations,
 ) nogil:
+    "This function is a copy of DADW with for the l == k + 2 case"
 
     cdef size_t b, i, j
     cdef float fanin, derivative, activation
