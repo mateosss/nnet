@@ -1,4 +1,5 @@
 profile = lambda f: f
+from lap import lap
 
 "Main user of nnet module"
 
@@ -53,7 +54,7 @@ def test(trainbatches, testbatches, net: NeuralNetwork, epoch):
     train_avgloss = train_cumloss / len(trainbatches)
     test_avgloss = test_cumloss / len(testbatches)
     test_time = time() - itime
-    print(
+    lap(
         f"[E] [{epoch + 1}] {train_avgloss=:.6f} {test_avgloss=:.6f} {test_time=:.2f}s"
     )
 
@@ -63,25 +64,25 @@ def train_epoch(trainbatches, net: NeuralNetwork, epoch):
     log_loss = 0
     log_time = time()
     for i, batch in enumerate(trainbatches):
-        print(f">>> evaluating batch {i=}")
+        lap(f">>> evaluating batch {i=}")
         loss, gradients = net.batch_eval(batch, BATCH_SIZE)
-        print(f">>> updating weights")
+        lap(f">>> updating weights")
         net.update_weights(gradients)
 
         # Assert improved loss
-        print(f">>> asserting improvement")
+        lap(f">>> asserting improvement")
         new_loss = net.batch_eval(batch, BATCH_SIZE, calc_grads=False)
         if new_loss > loss:
-            print(f"[W] loss increased by {100 * (new_loss - loss) / loss:.2f}%")
+            lap(f"[W] loss increased by {100 * (new_loss - loss) / loss:.2f}%")
 
         log_loss += loss
         if i % LOG_FREQ == LOG_FREQ - 1:
-            print(
+            lap(
                 f"[TR] [{epoch + 1}, {(i + 1) * BATCH_SIZE}] [{time() - log_time:.2f}s] "
                 f"avgloss: {log_loss / LOG_FREQ:.3f}"
             )
-            print(f">>> {loss=}")
-            # exit()
+            lap(f">>> {loss=}")
+            exit()
             log_time = time()
             log_loss = 0
 
@@ -89,18 +90,18 @@ def train_epoch(trainbatches, net: NeuralNetwork, epoch):
 def train(net: NeuralNetwork, trainbatches, testbatches):
     itime = time()
     for epoch in range(EPOCHS):
-        print(f">>> start {epoch=} train")
+        lap(f">>> start {epoch=} train")
         train_epoch(trainbatches, net, epoch)
-        print(f">>> start {epoch=} test")
+        lap(f">>> start {epoch=} test")
         test(trainbatches, testbatches, net, epoch)
-    print(f"[FINISH] Training finished in {time() - itime:.2f}s.")
+    lap(f"[FINISH] Training finished in {time() - itime:.2f}s.")
 
 
 def main():
     net = NeuralNetwork(DLAYERS, BATCH_SIZE)
     trainbatches = mnist.load("training", BATCH_SIZE)
     testbatches = mnist.load("testing", BATCH_SIZE)
-    print(">>> datasets initialized")
+    lap(">>> datasets initialized")
     train(net, trainbatches, testbatches)
 
 
