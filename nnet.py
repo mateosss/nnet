@@ -7,6 +7,7 @@ from typing import Dict, List, Union
 import numpy as _np  # not as np as we don't want the code getting float64
 
 import pyximport
+
 pyximport.install(inplace=True, language_level=3)
 import dadw
 
@@ -133,7 +134,7 @@ class NeuralNetwork:
         axis = 1 if self.is_batched else 0
         return ((self.activations[-1][..., :-1] - tgt) ** 2).mean(axis)
 
-    def dadw(self, l, q, k, i, j) -> float:
+    def py_dadw(self, l, q, k, i, j) -> float:
         """Return derivative of a^l_q with respect to w^k_ij."""
         # Memoization stuff
         args = (l, q, k, i, j)
@@ -166,7 +167,7 @@ class NeuralNetwork:
             )
         elif k < l - 1:
             res = sum(
-                self.weights[l - 1][r, q] * self.dadw(l - 1, r, k, i, j)
+                self.weights[l - 1][r, q] * self.py_dadw(l - 1, r, k, i, j)
                 for r in range(self.dlayers[l - 1])
             )
         else:
@@ -179,7 +180,7 @@ class NeuralNetwork:
         self._dadw_cache[args] = res
         return res
 
-    def get_gradients_slow(self, target) -> List[Array]:
+    def py_get_gradients(self, target) -> List[Array]:
         """Matrix of each error gradient ∇E^k_{i, j} using dadw()."""
         L = len(self.dlayers) - 1  # Last layer index
         mseconst = 2 / self.dlayers[-1]
@@ -190,66 +191,54 @@ class NeuralNetwork:
             for j in range(m):
                 for i in range(n + 1):  # +1 for bias neuron
                     gradients[k][i, j] = mseconst * sum(
-                        (self.activations[L][q] - target[q]) * self.dadw(L, q, k, i, j)
+                        (self.activations[L][q] - target[q])
+                        * self.py_dadw(L, q, k, i, j)
                         for q in range(self.dlayers[-1])
                     )
         return gradients
 
     @profile
-    def DADW(self, l, q, k):
+    def cy_DADW(self, l, q, k):
         return dadw.DADW(self, l, q, k)
 
     @profile
-    def DADW_prepopulate(self):
+    def cy_DADW_prepopulate(self):
         return dadw.DADW_prepopulate(self)
 
-    # @profile
-    # def DADW(self, l, q, k):
-    #     args = (l, q, k)
-    #     print(args, end="")
-    #     if args in self._DADW_cache:
-    #         print("HIT")
-    #         return self._DADW_cache[args]
-    #     print("MISS")
+    def np_DADW(self, l, q, k):
+        """Read only matrix A^{l, q}_k of each derivative of dadw(i, j)."""
+        args = (l, q, k)
+        if args in self._DADW_cache:
+            return self._DADW_cache[args]
 
-    #     return dadw.DADW(self, l, q, k)
+        res = zeros_like(self.gradients[k])  # (batch_size, n + 1, m)
+        if l == k + 1:
+            derivatives = gprime(self.fanin[l][..., q, AXIS])
+            columns = self.activations[k][:]
+            res[..., :, q] = derivatives * columns
+        elif l > k + 1:
+            for r in range(self.dlayers[l - 1]):
+                res += self.weights[l - 1][r, q] * self.np_DADW(l - 1, r, k)
+            derivatives = gprime(self.fanin[l][..., q, AXIS, AXIS])
+            res[...] *= derivatives
+            # for r in range(self.dlayers[l - 1]):
+            #     mul = self.weights[l - 1][r, q] * self.DADW(l - 1, r, k)
+            #     np.add(res, mul, out=res)
+            # derivatives = gprime(self.fanin[l][..., q, AXIS, AXIS])
+            # np.multiply(res, derivatives, out=res)
+        else:
+            raise Exception("This execution branch should not be reached.")
 
-
-    # def DADW(self, l, q, k):
-    #     """Read only matrix A^{l, q}_k of each derivative of dadw(i, j)."""
-    #     args = (l, q, k)
-    #     if args in self._DADW_cache:
-    #         return self._DADW_cache[args]
-
-    #     res = zeros_like(self.gradients[k])  # (batch_size, n + 1, m)
-    #     if l == k + 1:
-    #         derivatives = gprime(self.fanin[l][..., q, AXIS])
-    #         columns = self.activations[k][:]
-    #         res[..., :, q] = derivatives * columns
-    #     elif l > k + 1:
-    #         for r in range(self.dlayers[l - 1]):
-    #             res += self.weights[l - 1][r, q] * self.DADW(l - 1, r, k)
-    #         derivatives = gprime(self.fanin[l][..., q, AXIS, AXIS])
-    #         res[...] *= derivatives
-    #         # for r in range(self.dlayers[l - 1]):
-    #         #     mul = self.weights[l - 1][r, q] * self.DADW(l - 1, r, k)
-    #         #     np.add(res, mul, out=res)
-    #         # derivatives = gprime(self.fanin[l][..., q, AXIS, AXIS])
-    #         # np.multiply(res, derivatives, out=res)
-    #     else:
-    #         raise Exception("This execution branch should not be reached.")
-
-    #     res.setflags(write=False)  # As the result is cached, we make it readonly
-    #     self._DADW_cache[args] = res
-    #     return res
+        res.setflags(write=False)  # As the result is cached, we make it readonly
+        self._DADW_cache[args] = res
+        return res
 
     @profile
     def get_gradients(self, target: Array) -> List[Array]:
         """Matrix of each error gradient ∇E^k_{i, j} using DADW() matrices."""
-        cache = self.DADW_prepopulate()
+        cache = self.cy_DADW_prepopulate()
         for q in range(16):
             self._DADW_cache[(2, q, 0)] = cache[q]
-
 
         L = len(self.dlayers) - 1  # Last layer index
         mseconst = 2 / self.dlayers[L]
@@ -259,7 +248,7 @@ class NeuralNetwork:
             for q in range(self.dlayers[L]):
                 tgtdiff = self.activations[L][..., q] - target[..., q]
                 tgtdiff = tgtdiff[..., AXIS, AXIS]
-                ALqk = self.DADW(L, q, k)
+                ALqk = self.cy_DADW(L, q, k)
                 summation += tgtdiff * ALqk
             gradients[k] = mseconst * summation
         return gradients

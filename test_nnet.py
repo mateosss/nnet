@@ -110,7 +110,7 @@ def test_dadw(completeness=COMPLETENESS):
             ndadw = (b_out - a_out) / (2 * epsilon)
             wmatrix[i, j] = w
             net.feedforward(INPUT)  # Refreshes net fanin and activation
-            adadw = np.array([net.dadw(L, q, k, i, j) for q in range(dlayers[-1])])
+            adadw = np.array([net.py_dadw(L, q, k, i, j) for q in range(dlayers[-1])])
             # greatest relative difference
             diff = max(abs(ndadw - adadw)) / (
                 min(min(abs(ndadw)), min(abs(adadw))) or 1
@@ -133,7 +133,7 @@ def test_get_gradients():
 
     old_out = nnet.feedforward(INPUT)
     old_error = nnet.get_error(TARGET)
-    grads_dadw = nnet.get_gradients_slow(TARGET)
+    grads_dadw = nnet.py_get_gradients(TARGET)
     grads_DADW = nnet.get_gradients(TARGET)
 
     assert all(
