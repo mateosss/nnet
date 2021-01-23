@@ -116,36 +116,28 @@ cdef void DADW_pre(
                 cache[q, b, i, j] = derivative * w * derivative_prev * activation
 
 def DADW_prepopulate(self):
-    # cdef int l = 2
-    # cdef int k = 0
+    "Precalculate some of the needed DADW cache in a multithread burst"
+    cdef size_t l = 2
+    cdef size_t q
+    cdef size_t k = 0
+    cdef size_t num_threads = 4 # TODO: Get this number from OMP_NUM_THREADS envvar
 
     cdef float[:, :, :, ::1] cache = _np.zeros((16, 1000, 785, 16), dtype=DTYPE)
-    cdef size_t n = self.dlayers[0]
-    cdef size_t m = self.dlayers[1]
-    cdef size_t prev_l_sz = self.dlayers[1]
+    cdef size_t n = self.dlayers[k]
+    cdef size_t m = self.dlayers[k + 1]
+    cdef size_t prev_l_sz = self.dlayers[l - 1]
 
-    cdef const float[:, ::1] weights = self.weights[1]
-    cdef const float[:, ::1] fanins = self.fanin[2]
-    cdef const float[:, ::1] fanins_prev = self.fanin[1]
-    cdef const float[:, ::1] activations = self.activations[0]
-    with nogil, parallel(num_threads=4):
+    if m % num_threads != 0:
+        print(f"[W] m={m} % num_threads={num_threads} != 0, some threads will remain idle while others work")
+
+    cdef const float[:, ::1] weights = self.weights[l - 1]
+    cdef const float[:, ::1] fanins = self.fanin[l]
+    cdef const float[:, ::1] fanins_prev = self.fanin[l - 1]
+    cdef const float[:, ::1] activations = self.activations[k]
+
+    for q in prange(m, nogil=True, num_threads=num_threads):
         DADW_pre(
-            self, cache, 2, threadid(), 0,
-            n, m, prev_l_sz,
-            weights, fanins, fanins_prev, activations
-        )
-        DADW_pre(
-            self, cache, 2, 4 + threadid(), 0,
-            n, m, prev_l_sz,
-            weights, fanins, fanins_prev, activations
-        )
-        DADW_pre(
-            self, cache, 2, 8 + threadid(), 0,
-            n, m, prev_l_sz,
-            weights, fanins, fanins_prev, activations
-        )
-        DADW_pre(
-            self, cache, 2, 12 + threadid(), 0,
+            self, cache, l, q, k,
             n, m, prev_l_sz,
             weights, fanins, fanins_prev, activations
         )
