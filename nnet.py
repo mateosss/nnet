@@ -6,9 +6,9 @@ from typing import Dict, List, Union
 
 import numpy as _np  # not as np as we don't want the code getting float64
 
-import pyximport
+# import pyximport
+# pyximport.install(inplace=True, language_level=3)
 
-pyximport.install(inplace=True, language_level=3)
 import dadw
 
 _np.random.seed(1)
@@ -233,8 +233,10 @@ class NeuralNetwork:
         self._DADW_cache[args] = res
         return res
 
-    @profile
-    def get_gradients(self, target: Array) -> List[Array]:
+    def cy_get_gradients(self, target: Array) -> List[Array]:
+        return dadw.get_gradients(self, target)
+
+    def np_get_gradients(self, target: Array) -> List[Array]:
         """Matrix of each error gradient ∇E^k_{i, j} using DADW() matrices."""
         cache = self.cy_DADW_prepopulate()
         for q in range(16):
@@ -298,7 +300,7 @@ class NeuralNetwork:
         errors = self.get_error(targets)
         batch_loss = errors.mean()
         if calc_grads:
-            gradients = self.get_gradients(targets)
+            gradients = self.cy_get_gradients(targets)
             batch_gradients = [gms.mean(axis=0) for gms in gradients]
             return batch_loss, batch_gradients
         return batch_loss

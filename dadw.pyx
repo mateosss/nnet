@@ -81,12 +81,52 @@ cpdef DADW(self, size_t l, size_t q, size_t k):
     else:
         raise Exception("This execution branch should not be reached.")
 
-    res.setflags(write=False)  # As the result is cached, we make it readonly
+    # res.setflags(write=False)  # As the result is cached, we make it readonly
     self._DADW_cache[args] = res
     return res
 
+def get_gradients(object self, float[:, ::1] target):
+    """Matrix of each error gradient ∇E^k_{i, j} using DADW() matrices."""
+    cdef float[:, :, :, ::1] cache = DADW_prepopulate(self)
+    for q in range(16):
+        self._DADW_cache[(2, q, 0)] = cache[q]
 
+    cdef size_t L = len(self.dlayers) - 1  # Last layer index
+    cdef size_t sL = self.dlayers[L] # Last layer size
+    cdef float mseconst = 2 / self.dlayers[L]
+    cdef size_t n, m
 
+    cdef float[:, ::1] outputs = self.activations[L]
+    cdef float[::1] tgtdiff = _np.zeros(BATCH_SIZE, dtype=DTYPE)
+    cdef float[:, :, ::1] summation
+    cdef float[:, :, ::1] ALqk
+
+    gradients = [None for _ in self.weights]
+
+    for k in reversed(range(L)):
+        summation = _np.zeros_like(self.gradients[k], dtype=DTYPE)  # (batch_size, n + 1, m)
+        n = self.dlayers[k]
+        m = self.dlayers[k + 1]
+        for q in range(sL):
+            for b in range(BATCH_SIZE):
+                tgtdiff[b] = outputs[b, q] - target[b, q]
+
+            ALqk = DADW(self, L, q, k)
+            for b in range(BATCH_SIZE):
+                for i in range(n + 1):
+                    for j in range(m):
+                        summation[b, i, j] += tgtdiff[b] * ALqk[b, i, j]
+
+            # tgtdiff = self.activations[L][..., q] - target[..., q]
+            # tgtdiff = tgtdiff[..., AXIS, AXIS]
+            # ALqk = self.cy_DADW(L, q, k)
+            # summation += tgtdiff * ALqk
+        for b in range(BATCH_SIZE):
+            for i in range(n + 1):
+                for j in range(m):
+                    summation[b, i, j] *= mseconst
+        gradients[k] = _np.asarray(summation)
+    return gradients
 
 cdef void DADW_pre(
     object self, float [:, :, :, ::1] cache, size_t l, size_t q, size_t k,
