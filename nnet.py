@@ -125,7 +125,9 @@ class NeuralNetwork:
 
         self.activations[0][..., :-1] = ilayer
         for k in range(1, len(self.dlayers)):
-            self.fanin[k] = self.activations[k - 1] @ self.weights[k - 1]
+            # TODO: Numpy matmul @ should be used here, however see cython matmul docstring
+            # self.fanin[k] = self.activations[k - 1] @ self.weights[k - 1]
+            dadw.matmul(self.activations[k - 1], self.weights[k - 1], self.fanin[k])
             self.activations[k][..., :-1] = g(self.fanin[k])
         return self.activations[-1][..., :-1].copy()  # Remove bias neuron from result
 

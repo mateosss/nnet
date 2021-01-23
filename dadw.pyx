@@ -24,6 +24,24 @@ cdef float _g(float x) nogil:
 cdef float _gprime(float h) nogil:
     return _g(h) * (1 - _g(h))
 
+
+cpdef void matmul(float[:, :] A, float[:, :] B, float[:, :] out):
+    """matrix multiply A (n x m) and B (m x l) into out (n x l)
+    Needed as numpy matmul @ was working unpredictably. See commit bb58858
+    Running with `kernprof -l main.py` was faster than running `python main.py`.
+    """
+    cdef size_t i, j, k
+    cdef float s
+    cdef size_t n = A.shape[0], m = A.shape[1]
+    cdef size_t mm = B.shape[0], l = B.shape[1]
+
+    for i in range(n):
+        for j in range(l):
+            s = 0
+            for k in range(m):
+                s += A[i, k] * B[k, j]
+            out[i, j] = s
+
 cpdef DADW(self, size_t l, size_t q, size_t k):
     """Read only matrix A^{l, q}_k of each derivative of dadw(i, j)."""
     args = (l, q, k)
