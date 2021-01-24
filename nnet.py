@@ -1,13 +1,7 @@
-profile = lambda f: f
-
-
 from functools import partial
 from typing import Dict, List, Union
 
 import numpy as _np  # not as np as we don't want the code getting float64
-
-# import pyximport
-# pyximport.install(inplace=True, language_level=3)
 
 import dadw
 
@@ -199,11 +193,9 @@ class NeuralNetwork:
                     )
         return gradients
 
-    @profile
     def cy_DADW(self, l, q, k):
         return dadw.DADW(self, l, q, k)
 
-    @profile
     def cy_DADW_prepopulate(self):
         return dadw.DADW_prepopulate(self)
 
@@ -293,7 +285,6 @@ class NeuralNetwork:
     #         return batch_loss, batch_gradient
     #     return batch_loss
 
-    @profile
     def batch_eval(self, batch, batch_size, calc_grads=True):
         """Return mean losses and mean gradients (if calc_grads) over a batch.
 
