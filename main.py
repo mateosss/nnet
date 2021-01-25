@@ -42,17 +42,23 @@ def genetic_main():
 
 def test(trainbatches, testbatches, net: NeuralNetwork, epoch):
     itime = time()
-    train_cumloss = 0
-    test_cumloss = 0
+    train_cumloss = train_cumhits = 0
+    test_cumloss = test_cumhits = 0
     for batch in trainbatches:
-        train_cumloss += net.batch_eval(batch, BATCH_SIZE, calc_grads=False)
+        cumloss, cumhits = net.batch_eval(batch, grads=False, hitrate=True)
+        train_cumloss += cumloss
+        train_cumhits += cumhits
     for batch in testbatches:
-        test_cumloss += net.batch_eval(batch, BATCH_SIZE, calc_grads=False)
+        cumloss, cumhits = net.batch_eval(batch, grads=False, hitrate=True)
+        test_cumloss += cumloss
+        test_cumhits += cumhits
     train_avgloss = train_cumloss / len(trainbatches)
+    train_hitrate = train_cumhits / len(trainbatches)
     test_avgloss = test_cumloss / len(testbatches)
+    test_hitrate = test_cumhits / len(testbatches)
     test_time = time() - itime
     print(
-        f"[E] [{epoch + 1}] {train_avgloss=:.6f} {test_avgloss=:.6f} {test_time=:.2f}s"
+        f"[E] [{epoch + 1}] {train_avgloss=:.6f} {train_hitrate=:.2f}% {test_avgloss=:.6f} {test_hitrate=:.2f}% {test_time=:.2f}s"
     )
 
 
@@ -60,11 +66,11 @@ def train_epoch(trainbatches, net: NeuralNetwork, epoch):
     log_loss = 0
     log_time = time()
     for i, batch in enumerate(trainbatches):
-        loss, gradients = net.batch_eval(batch, BATCH_SIZE)
+        loss, gradients = net.batch_eval(batch)
         net.update_weights(gradients)
 
         # Assert improved loss
-        # new_loss = net.batch_eval(batch, BATCH_SIZE, calc_grads=False)
+        # new_loss = net.batch_eval(batch, grads=False)
         # if new_loss > loss:
         #     print(f"[W] loss increased by {100 * (new_loss - loss) / loss:.2f}%")
 

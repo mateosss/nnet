@@ -285,17 +285,26 @@ class NeuralNetwork:
     #         return batch_loss, batch_gradient
     #     return batch_loss
 
-    def batch_eval(self, batch, batch_size, calc_grads=True):
-        """Return mean losses and mean gradients (if calc_grads) over a batch.
+    def batch_eval(self, batch, grads=True, hitrate=False):
+        """Return mean losses, mean gradients (if grads) and hitrate (if hitrate) of a batch.
 
         All batches must be not larger than batch_size.
         """
         inputs, targets = batch
+        batch_size = len(inputs)
         outputs = self.feedforward(inputs)
         errors = self.get_error(targets)
         batch_loss = errors.mean()
-        if calc_grads:
+        results = [batch_loss]
+        if grads:
             gradients = self.cy_get_gradients(targets)
             batch_gradients = [gms.mean(axis=0) for gms in gradients]
-            return batch_loss, batch_gradients
-        return batch_loss
+            results.append(batch_gradients)
+        if hitrate:
+            target_digits = targets.argmax(1)
+            output_digits = outputs.argmax(1)
+            batch_hitrate = sum(target_digits == output_digits) / batch_size
+            results.append(batch_hitrate)
+        if len(results) == 1:
+            results = results[0]
+        return results
