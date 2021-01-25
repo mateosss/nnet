@@ -1,4 +1,3 @@
-from main import BATCH_SIZE
 import os
 import struct
 from typing import List, Tuple
@@ -10,8 +9,9 @@ import numpy as np
 def load(
     dataset: str = "training", batch_size=10, path: str = "./mnist_training_data"
 ) -> List[Tuple[np.array, np.array]]:
-    """Import mnist dataset.
-    Return list of batches like (batch_size x 784 images, batch_size x 10 labels)
+    """Import and process mnist dataset.
+    Return generator of lists of batches
+    with batch shape: (images: batch_size x 784, labels: batch_size x 10)
     Based on https://gist.github.com/akesling/5358964
     """
 
@@ -27,16 +27,28 @@ def load(
         lbl = np.zeros((num, 10), dtype=np.float32)
         for i, row in enumerate(lbl):
             row[lblt[i]] = 1
-        lbl = lbl.reshape((num // BATCH_SIZE, BATCH_SIZE, 10))
 
     with open(fname_img, "rb") as fimg:
         magic, num, rows, cols = struct.unpack(">IIII", fimg.read(16))
         assert num % batch_size == 0
         img = np.fromfile(fimg, dtype=np.uint8)
         img = img.astype(np.float32)
-        img = img.reshape(num // batch_size, batch_size, rows * cols)
         img /= 255
-    return list(zip(img, lbl))
+        img.shape = (num, rows * cols)
+
+    while True:
+        shuffle(img, lbl)
+        batched_imgs = img.reshape(num // batch_size, batch_size, rows * cols)
+        batched_lbls = lbl.reshape((num // batch_size, batch_size, 10))
+        yield list(zip(batched_imgs, batched_lbls))
+
+
+def shuffle(a, b) -> None:
+    """Shuffle arrays a and b inplace moving elements over axis 0 to the same indices"""
+    prev_rng_state = np.random.get_state()
+    np.random.shuffle(a)
+    np.random.set_state(prev_rng_state)
+    np.random.shuffle(b)
 
 
 def show(image: np.array) -> None:

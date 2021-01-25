@@ -78,9 +78,10 @@ def train_epoch(trainbatches, net: NeuralNetwork, epoch):
             log_loss = 0
 
 
-def train(net: NeuralNetwork, trainbatches, testbatches):
+def train(net: NeuralNetwork, trainbatches_gen, testbatches_gen):
     itime = time()
-    for epoch in range(EPOCHS):
+    epoch_train_test = zip(range(EPOCHS), trainbatches_gen, testbatches_gen)
+    for epoch, trainbatches, testbatches in epoch_train_test:
         train_epoch(trainbatches, net, epoch)
         test(trainbatches, testbatches, net, epoch)
     print(f"[FINISH] Training finished in {time() - itime:.2f}s.")
@@ -88,9 +89,9 @@ def train(net: NeuralNetwork, trainbatches, testbatches):
 
 def main():
     net = NeuralNetwork(DLAYERS, BATCH_SIZE)
-    trainbatches = mnist.load("training", BATCH_SIZE)
-    testbatches = mnist.load("testing", BATCH_SIZE)
-    train(net, trainbatches, testbatches)
+    trainbatches_gen = mnist.load("training", BATCH_SIZE)
+    testbatches_gen = mnist.load("testing", BATCH_SIZE)
+    train(net, trainbatches_gen, testbatches_gen)
 
 
 if __name__ == "__main__":

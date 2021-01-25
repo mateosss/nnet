@@ -17,10 +17,8 @@ np.random.seed(1)  # TODO: Remove?
 WTOL = 10  # weights must be within [-WTOL, +WTOL]
 COMPLETENESS = 0.05  # ratio of loops that will be effectively tested
 
-SAMPLE = mnist.read()
-IMAGE, LABEL = next(SAMPLE)  # the one image used for testing
-INPUT = np.array([pixel / 255 for row in IMAGE for pixel in row])
-TARGET = np.array([1 if i == LABEL else 0 for i in range(10)])
+BATCHES = mnist.load(batch_size=1000)
+INPUT, TARGET = BATCHES[0]  # the one image used for testing
 
 
 @dataclass
@@ -199,3 +197,16 @@ def test_numerical_gradient_checking(completeness=COMPLETENESS):
         # would be a good value for them
         # TODO: Investigate for a good formula, and what result to expect
         # TODO: Put a proper assertion in this test following that formula
+
+
+def test_mnist_shuffle():
+    a = np.arange(1000)
+    b = np.arange(1000)
+    mnist.shuffle(a, b)
+    assert all(a == b)
+
+    A = np.arange(100 * 10).reshape(100, 10)
+    AA = A.copy()
+    idx = np.arange(100)
+    mnist.shuffle(AA, idx)
+    assert (AA == A[idx]).all()
