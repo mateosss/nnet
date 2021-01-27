@@ -174,6 +174,10 @@ cdef void DADW_pre(
 def DADW_prepopulate(self):
     "Precalculate some of the needed DADW cache in a multithread burst"
 
+    if len(self.dlayers <= 3):
+        return
+    assert len(self.dlayers) == 4 # Read TODO comment below
+
     # TODO: This prefill is needed for performance in networks of more than
     # three layers (counting input and output layers)
     # This function right now is designed solely for the case of four layers
