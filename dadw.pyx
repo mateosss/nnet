@@ -2,6 +2,8 @@
 # distutils: extra_link_args=-fopenmp
 # cython: language_level=3, boundscheck=False, wraparound=False
 
+# TODO: Remove unused underscores
+
 import os
 import numpy as _np  # not as np as we don't want the code getting float64
 
@@ -10,7 +12,7 @@ from cython.parallel import prange
 cimport cython
 from libc.math cimport exp
 
-cdef size_t BATCH_SIZE = 1000
+cdef size_t BATCH_SIZE = 1000 # TODO: Redundant, already in main.py
 
 assert os.getenv("OMP_NUM_THREADS"), "Unset OMP_NUM_THREADS envvar"
 cdef size_t OMP_NUM_THREADS = int(os.getenv("OMP_NUM_THREADS"))
@@ -18,10 +20,10 @@ cdef size_t OMP_NUM_THREADS = int(os.getenv("OMP_NUM_THREADS"))
 DTYPE = _np.float32
 AXIS = _np.newaxis
 
-cdef float _g(float x) nogil:
+cdef float _g(float x) nogil: # TODO: Redundant, already in nnet
     return 1 / (1 + exp(-x))
 
-cdef float _gprime(float h) nogil:
+cdef float _gprime(float h) nogil: # TODO: Redundant, already in nnet
     return _g(h) * (1 - _g(h))
 
 
@@ -45,8 +47,11 @@ cpdef void matmul(float[:, :] A, float[:, :] B, float[:, :] out):
 cpdef DADW(self, size_t l, size_t q, size_t k):
     """Read only matrix A^{l, q}_k of each derivative of dadw(i, j)."""
     args = (l, q, k)
+    print(args, end="")
     if args in self._DADW_cache:
+        print("HIT")
         return self._DADW_cache[args]
+    print("MISS")
 
     res = _np.zeros_like(self.gradients[k], dtype=DTYPE)  # (batch_size, n + 1, m)
     cdef float [:, :, ::1] _res = res
@@ -177,6 +182,18 @@ cdef void DADW_pre(
 
 def DADW_prepopulate(self):
     "Precalculate some of the needed DADW cache in a multithread burst"
+
+    # TODO: This prefill is needed for performance in networks of more than
+    # three layers (counting input and output layers)
+    # This function right now is designed solely for the case of four layers
+    # But it is possible to generalize it with the following pseudo algorithm:
+    # for k = L - 1 - 2 downto k = 0 do
+    #     for l = k + 2 to l = L - 1 do
+    #         use previous l generated cache to
+    #         cache DADW(l, 0, k), ..., DADW(l, #l, k)
+    # Note that in the inner loop, iterations before the last one are unused
+    # thus their memory can be reused to prevent more mallocs.
+
     cdef size_t l = 2
     cdef size_t q
     cdef size_t k = 0
