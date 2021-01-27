@@ -46,13 +46,6 @@ cpdef void matmul(float[:, :] A, float[:, :] B, float[:, :] out):
 
 cpdef DADW(self, size_t l, size_t q, size_t k):
     """Read only matrix A^{l, q}_k of each derivative of dadw(i, j)."""
-    args = (l, q, k)
-    print(args, end="")
-    if args in self._DADW_cache:
-        print("HIT")
-        return self._DADW_cache[args]
-    print("MISS")
-
     res = _np.zeros_like(self.gradients[k], dtype=DTYPE)  # (batch_size, n + 1, m)
     cdef float [:, :, ::1] _res = res
 
@@ -93,7 +86,7 @@ cpdef DADW(self, size_t l, size_t q, size_t k):
                     _res[b, i, j] = derivative * w * derivative_prev * activation
     elif l > k + 1:
         for r in range(prev_l_sz):
-            prev_A = DADW(self, l - 1, r, k)
+            prev_A = self._DADW_cache[(l - 1, r, k)]
             w = weights[r, q]
             # for b in range(BATCH_SIZE):
             for b in prange(BATCH_SIZE, nogil=True):
@@ -109,8 +102,6 @@ cpdef DADW(self, size_t l, size_t q, size_t k):
     else:
         raise Exception("This execution branch should not be reached.")
 
-    # res.setflags(write=False)  # As the result is cached, we make it readonly
-    self._DADW_cache[args] = res
     return res
 
 def get_gradients(object self, float[:, ::1] target):
@@ -193,6 +184,7 @@ def DADW_prepopulate(self):
     #         cache DADW(l, 0, k), ..., DADW(l, #l, k)
     # Note that in the inner loop, iterations before the last one are unused
     # thus their memory can be reused to prevent more mallocs.
+    # Right now, this function is doing just one loop of the previous algorithm.
 
     cdef size_t l = 2
     cdef size_t q
