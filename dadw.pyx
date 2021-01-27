@@ -11,13 +11,15 @@ from cython.parallel import prange
 
 cimport cython
 from libc.math cimport exp
+from libc.string cimport memset
 
 cdef size_t BATCH_SIZE = 1000 # TODO: Redundant, already in main.py
 
 assert os.getenv("OMP_NUM_THREADS"), "Unset OMP_NUM_THREADS envvar"
 cdef size_t OMP_NUM_THREADS = int(os.getenv("OMP_NUM_THREADS"))
 
-DTYPE = _np.float32
+DTYPE = _np.dtype("float32")
+cdef size_t DTYPE_SIZE = DTYPE.itemsize
 AXIS = _np.newaxis
 
 cdef float _g(float x) nogil: # TODO: Redundant, already in nnet
@@ -26,6 +28,10 @@ cdef float _g(float x) nogil: # TODO: Redundant, already in nnet
 cdef float _gprime(float h) nogil: # TODO: Redundant, already in nnet
     return _g(h) * (1 - _g(h))
 
+cdef void zerofill3(float[:, :, ::1] out, size_t X, size_t Y, size_t Z) nogil:
+    cdef size_t x, y, z
+    for x in prange(X, nogil=True):
+        memset(&out[x,0,0], 0, Y * Z * DTYPE_SIZE)
 
 cpdef void matmul(float[:, :] A, float[:, :] B, float[:, :] out):
     """matrix multiply A (n x m) and B (m x l) into out (n x l)
@@ -44,10 +50,11 @@ cpdef void matmul(float[:, :] A, float[:, :] B, float[:, :] out):
                 s += A[i, k] * B[k, j]
             out[i, j] = s
 
-cpdef DADW(self, size_t l, size_t q, size_t k):
-    """Read only matrix A^{l, q}_k of each derivative of dadw(i, j)."""
-    res = _np.zeros_like(self.gradients[k], dtype=DTYPE)  # (batch_size, n + 1, m)
-    cdef float [:, :, ::1] _res = res
+cpdef DADW(self, size_t l, size_t q, size_t k, float[:, :, ::1] out):
+    """Read only matrix A^{l, q}_k of each derivative of dadw(i, j).
+
+    out must be a matrix of size (BATCH_SIZE, n + 1, m) to overwrite.
+    """
 
     cdef size_t n = self.dlayers[k]
     cdef size_t m = self.dlayers[k + 1]
@@ -65,15 +72,14 @@ cpdef DADW(self, size_t l, size_t q, size_t k):
     cdef const float[:, :, ::1] prev_A
 
     if l == k + 1:
-        # for b in range(BATCH_SIZE):
+        zerofill3(out, BATCH_SIZE, n + 1, m)
         for b in prange(BATCH_SIZE, nogil=True):
             fanin = fanins[b, q]
             derivative = _gprime(fanin)
             for i in range(n + 1):
                 activation = activations[b, i]
-                _res[b, i, q] = derivative * activation
+                out[b, i, q] = derivative * activation
     elif l == k + 2:
-        # for b in range(BATCH_SIZE):
         for b in prange(BATCH_SIZE, nogil=True):
             fanin = fanins[b, q]
             derivative = _gprime(fanin)
@@ -83,26 +89,24 @@ cpdef DADW(self, size_t l, size_t q, size_t k):
                     fanin_prev = fanins_prev[b, j]
                     derivative_prev = _gprime(fanin_prev)
                     w = weights[j, q]
-                    _res[b, i, j] = derivative * w * derivative_prev * activation
+                    out[b, i, j] = derivative * w * derivative_prev * activation
     elif l > k + 1:
+        zerofill3(out, BATCH_SIZE, n + 1, m)
         for r in range(prev_l_sz):
             prev_A = self._DADW_cache[(l - 1, r, k)]
             w = weights[r, q]
-            # for b in range(BATCH_SIZE):
             for b in prange(BATCH_SIZE, nogil=True):
                 for i in range(n + 1):
                     for j in range(m):
-                        _res[b, i, j] += w * prev_A[b, i, j]
+                        out[b, i, j] += w * prev_A[b, i, j]
         for b in range(BATCH_SIZE):
             fanin = fanins[b, q]
             derivative = _gprime(fanin)
             for i in range(n + 1):
                 for j in range(m):
-                    _res[b, i, j] *= derivative
+                    out[b, i, j] *= derivative
     else:
         raise Exception("This execution branch should not be reached.")
-
-    return res
 
 def get_gradients(object self, float[:, ::1] target):
     """Matrix of each error gradient ∇E^k_{i, j} using DADW() matrices."""
@@ -125,12 +129,13 @@ def get_gradients(object self, float[:, ::1] target):
 
     for k in reversed(range(L)):
         summation = _np.zeros_like(self.gradients[k], dtype=DTYPE)  # (batch_size, n + 1, m)
+        ALqk = _np.zeros_like(self.gradients[k], dtype=DTYPE)
         n = self.dlayers[k]
         m = self.dlayers[k + 1]
         for q in range(sL):
             for b in range(BATCH_SIZE):
                 tgtdiff[b] = outputs[b, q] - target[b, q]
-            ALqk = DADW(self, L, q, k)
+            DADW(self, L, q, k, ALqk)
             for b in prange(BATCH_SIZE, nogil=True):
                 for i in range(n + 1):
                     for j in range(m):
@@ -174,7 +179,7 @@ cdef void DADW_pre(
 def DADW_prepopulate(self):
     "Precalculate some of the needed DADW cache in a multithread burst"
 
-    if len(self.dlayers <= 3):
+    if len(self.dlayers) <= 3:
         return
     assert len(self.dlayers) == 4 # Read TODO comment below
 
