@@ -37,10 +37,10 @@ def load(
         img.shape = (num, rows * cols)
 
     while True:
-        shuffle(img, lbl)
         batched_imgs = img.reshape(num // batch_size, batch_size, rows * cols)
         batched_lbls = lbl.reshape((num // batch_size, batch_size, 10))
         yield list(zip(batched_imgs, batched_lbls))
+        shuffle(img, lbl)
 
 
 def shuffle(a, b) -> None:
