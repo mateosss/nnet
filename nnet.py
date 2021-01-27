@@ -293,7 +293,7 @@ class NeuralNetwork:
         inputs, targets = batch
         batch_size = len(inputs)
         outputs = self.feedforward(inputs)
-        errors = self.get_error(targets)
+        errors = self.get_error(inputs)
         batch_loss = errors.mean()
         results = [batch_loss]
         if grads:
