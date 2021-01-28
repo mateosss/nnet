@@ -125,6 +125,7 @@ def get_gradients(object self, float[:, ::1] target):
     cdef float[:, ::1] fanin1 = self.fanin[1]
     cdef float[:, ::1] fanin2 = self.fanin[2]
     cdef float[:, ::1] activation0 = self.activations[0]
+    cdef float[:, ::1] activation1 = self.activations[1]
     cdef float[:, ::1] weight1 = self.weights[1]
 
     cdef float[:, :, :, ::1] cache = DADW_prepopulate(self)
@@ -139,19 +140,14 @@ def get_gradients(object self, float[:, ::1] target):
     ALqk = _np.zeros_like(self.gradients[k], dtype=DTYPE)
     n = self.dlayers[k]
     m = self.dlayers[k + 1]
-    for q in range(sL):
-        for b in range(BATCH_SIZE):
-            tgtdiff[b] = outputs[b, q] - target[b, q]
-        DADW(self, L, q, k, ALqk)
-        for b in prange(BATCH_SIZE, nogil=True):
-            for i in range(n + 1):
-                for j in range(m):
-                    summation[b, i, j] += tgtdiff[b] * ALqk[b, i, j]
-    for b in prange(BATCH_SIZE, nogil=True):
+    for b in range(BATCH_SIZE):
         for i in range(n + 1):
             for j in range(m):
-                summation[b, i, j] *= mseconst
-    gradients[k] = _np.asarray(summation)
+                ALqk[b, i, j] = (
+                    mseconst * (outputs[b, j] - target[b, j])
+                    * _gprime(fanin2[b, j]) * activation1[b, i]
+                )
+    gradients[k] = _np.asarray(ALqk)
 
     k = 0
     print(f"k={k}")
