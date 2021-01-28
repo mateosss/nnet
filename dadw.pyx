@@ -121,7 +121,7 @@ def get_gradients(object self, float[:, ::1] target):
     cdef float[:, :, ::1] summation
     cdef float[:, :, ::1] ALqk
 
-    cdef float summ = 0
+    cdef float a1i, gh1j, summ = 0 # summ = 0 needed or cython complains
     cdef float[:, ::1] fanin1 = self.fanin[1]
     cdef float[:, ::1] fanin2 = self.fanin[2]
     cdef float[:, ::1] activation0 = self.activations[0]
@@ -134,38 +134,35 @@ def get_gradients(object self, float[:, ::1] target):
 
     gradients = [None for _ in self.weights]
 
+    # Explicit iteration k=1 for better performance
     k = 1
-    print(f"k={k}")
-    summation = _np.zeros_like(self.gradients[k], dtype=DTYPE)  # (batch_size, n + 1, m)
-    ALqk = _np.zeros_like(self.gradients[k], dtype=DTYPE)
-    n = self.dlayers[k]
-    m = self.dlayers[k + 1]
-    for b in range(BATCH_SIZE):
-        for i in range(n + 1):
-            for j in range(m):
-                ALqk[b, i, j] = (
-                    mseconst * (outputs[b, j] - target[b, j])
-                    * _gprime(fanin2[b, j]) * activation1[b, i]
-                )
-    gradients[k] = _np.asarray(ALqk)
-
-    k = 0
-    print(f"k={k}")
-    summation = _np.zeros_like(self.gradients[k], dtype=DTYPE)  # (batch_size, n + 1, m)
-    ALqk = _np.zeros_like(self.gradients[k], dtype=DTYPE)
+    ALqk = _np.empty_like(self.gradients[k], dtype=DTYPE)
     n = self.dlayers[k]
     m = self.dlayers[k + 1]
     for b in prange(BATCH_SIZE, nogil=True):
         for i in range(n + 1):
+            a1i = activation1[b, i]
             for j in range(m):
-                ALqk[b, i, j] = mseconst * _gprime(fanin1[b, j]) * activation0[b, i]
+                ALqk[b, i, j] = (
+                    mseconst * (outputs[b, j] - target[b, j])
+                    * _gprime(fanin2[b, j]) * a1i
+                )
+    gradients[k] = _np.asarray(ALqk)
+
+    # Explicit iteration k=0 for better performance
+    k = 0
+    ALqk = _np.empty_like(self.gradients[k], dtype=DTYPE)
+    n = self.dlayers[k]
+    m = self.dlayers[k + 1]
     for b in prange(BATCH_SIZE, nogil=True):
         for j in range(m):
             summ = 0
             for q in range(sL):
                 summ += (outputs[b, q] - target[b, q]) * _gprime(fanin2[b, q]) * weight1[j, q]
+            gh1j = _gprime(fanin1[b, j])
             for i in range(n + 1):
-                ALqk[b, i, j] *= summ
+                ALqk[b, i, j] = mseconst * gh1j * activation0[b, i]
+                ALqk[b, i, j] *= summ # NOTE: *= needed or cython complains
     gradients[k] = _np.asarray(ALqk)
 
     return gradients
