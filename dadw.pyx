@@ -117,8 +117,6 @@ def get_gradients(object self, float[:, ::1] target):
     cdef size_t n, m, k, q, b, i, j
 
     cdef float[:, ::1] outputs = self.activations[L]
-    cdef float[::1] tgtdiff = _np.zeros(BATCH_SIZE, dtype=DTYPE)
-    cdef float[:, :, ::1] summation
     cdef float[:, :, ::1] ALqk
 
     cdef float a1i, gh1j, summ = 0 # summ = 0 needed or cython complains
@@ -128,17 +126,13 @@ def get_gradients(object self, float[:, ::1] target):
     cdef float[:, ::1] activation1 = self.activations[1]
     cdef float[:, ::1] weight1 = self.weights[1]
 
-    cdef float[:, :, :, ::1] cache = DADW_prepopulate(self)
-    for q in range(16):
-        self._DADW_cache[(2, q, 0)] = cache[q]
-
     gradients = [None for _ in self.weights]
 
     # Explicit iteration k=1 for better performance
     k = 1
-    ALqk = _np.empty_like(self.gradients[k], dtype=DTYPE)
     n = self.dlayers[k]
     m = self.dlayers[k + 1]
+    ALqk = _np.empty((BATCH_SIZE, n + 1, m), dtype=DTYPE)
     for b in prange(BATCH_SIZE, nogil=True):
         for i in range(n + 1):
             a1i = activation1[b, i]
@@ -151,9 +145,9 @@ def get_gradients(object self, float[:, ::1] target):
 
     # Explicit iteration k=0 for better performance
     k = 0
-    ALqk = _np.empty_like(self.gradients[k], dtype=DTYPE)
     n = self.dlayers[k]
     m = self.dlayers[k + 1]
+    ALqk = _np.empty((BATCH_SIZE, n + 1, m), dtype=DTYPE)
     for b in prange(BATCH_SIZE, nogil=True):
         for j in range(m):
             summ = 0
