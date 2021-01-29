@@ -1,24 +1,27 @@
 from functools import partial
 from typing import Dict, List, Union
 
-import numpy as _np  # not as np as we don't want the code getting float64
+import numpy as _np
+# not as np as we don't want the code to use numpy directly
+# because it may be getting undesired float64 unintentionally
 
 import dadw
 
 _np.random.seed(1)
 
-# Use float32 everywhere
-# TODO: The dtype to use should be a parameter of the neural network
+# TODO: The DTYPE should be a parameter of NeuralNetwork
+# Use same DTYPE for everything
+DTYPE = _np.dtype("float32")
 Array = Union[_np.ndarray]
 AXIS = _np.newaxis
-array = partial(_np.array, dtype=_np.float32)
-zeros = partial(_np.zeros, dtype=_np.float32)
-zeros_like = partial(_np.zeros_like, dtype=_np.float32)
+array = partial(_np.array, dtype=DTYPE)
+zeros = partial(_np.zeros, dtype=DTYPE)
+zeros_like = partial(_np.zeros_like, dtype=DTYPE)
 concatenate = _np.concatenate
 cumsum = _np.cumsum
-sqrt = partial(_np.sqrt, dtype=_np.float32)
-exp = partial(_np.exp, dtype=_np.float32)
-randn = lambda *a, **kw: _np.random.standard_normal(*a, **kw).astype(_np.float32)
+sqrt = partial(_np.sqrt, dtype=DTYPE)
+exp = partial(_np.exp, dtype=DTYPE)
+randn = lambda *a, **kw: _np.random.standard_normal(*a, **kw).astype(DTYPE)
 
 # TODO: Try more activation functions as ReLU and others
 # TODO: Move activation function inside class
@@ -131,7 +134,7 @@ class NeuralNetwork:
         axis = 1 if self.is_batched else 0
         return ((self.activations[-1][..., :-1] - tgt) ** 2).mean(axis)
 
-    def py_dadw(self, l, q, k, i, j, b=0) -> float:
+    def py_dadw(self, l, q, k, i, j, b=0): # -> DTYPE
         """Return derivative of a^l_q with respect to w^k_ij for batch sample b."""
         # Memoization stuff
         args = (l, q, k, i, j)
