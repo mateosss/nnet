@@ -8,6 +8,7 @@ import dadw
 _np.random.seed(1)
 
 # Use float32 everywhere
+# TODO: The dtype to use should be a parameter of the neural network
 Array = Union[_np.ndarray]
 AXIS = _np.newaxis
 array = partial(_np.array, dtype=_np.float32)
@@ -130,8 +131,8 @@ class NeuralNetwork:
         axis = 1 if self.is_batched else 0
         return ((self.activations[-1][..., :-1] - tgt) ** 2).mean(axis)
 
-    def py_dadw(self, l, q, k, i, j) -> float:
-        """Return derivative of a^l_q with respect to w^k_ij."""
+    def py_dadw(self, l, q, k, i, j, b=0) -> float:
+        """Return derivative of a^l_q with respect to w^k_ij for batch sample b."""
         # Memoization stuff
         args = (l, q, k, i, j)
         if args in self._dadw_cache:
@@ -154,12 +155,12 @@ class NeuralNetwork:
         elif k == l - 1 and j != q:  # Weight just before neuron but disconnected
             res = 0
         elif k == l - 1 and j == q:  # Weight just before neuron and connected
-            res = self.activations[k][i]
+            res = self.activations[k][b, i]
         elif k == l - 2:  # Special case for performance, not needed for correctness
             res = (
                 self.weights[l - 1][j, q]
-                * gprime(self.fanin[l - 1][j])
-                * self.activations[k][i]
+                * gprime(self.fanin[l - 1][b, j])
+                * self.activations[k][b, i]
             )
         elif k < l - 1:
             res = sum(
@@ -170,7 +171,7 @@ class NeuralNetwork:
             raise Exception("Should never reach this execution branch")
 
         # Multiply by derivative of activation function over the neuron's weighted sum
-        res *= gprime(self.fanin[l][q])
+        res *= gprime(self.fanin[l][b, q])
 
         # Cache it
         self._dadw_cache[args] = res

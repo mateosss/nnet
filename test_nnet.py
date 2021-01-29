@@ -17,8 +17,10 @@ np.random.seed(1)  # TODO: Remove?
 WTOL = 10  # weights must be within [-WTOL, +WTOL]
 COMPLETENESS = 0.05  # ratio of loops that will be effectively tested
 
-BATCHES = mnist.load(batch_size=1000)
-INPUT, TARGET = BATCHES[0]  # the one image used for testing
+EPOCHS = mnist.load(batch_size=1000)  # Epoch batches generator
+BATCHES = next(EPOCHS)  # Epoch mini batches
+BATCH = BATCHES[0]
+INPUT, TARGET = BATCH[0][0], BATCH[1][0]  # Single sample used for testing
 
 
 @dataclass
@@ -86,10 +88,12 @@ def test_dadw(completeness=COMPLETENESS):
 
     It predicts a change in output neurons close enough to what a slight numerical
     nudge to each weight produces to the network outputs.
+
+    Based on https://cs231n.github.io/neural-networks-3/#gradcheck
     """
     dlayers = [784, 16, 16, 10]
     L = len(dlayers) - 1  # Last layer index
-    net = NeuralNetwork(dlayers)
+    net = NeuralNetwork(dlayers, batch_size=1)
 
     # maximum relative difference between numerical and analytical dadw
     maxreldiff = 0
@@ -101,21 +105,24 @@ def test_dadw(completeness=COMPLETENESS):
         for (i, j), w in np.ndenumerate(wmatrix):
             if not loop():
                 continue
+
             wmatrix[i, j] = w - epsilon
-            a_out = net.feedforward(INPUT)
+            a_out = net.feedforward(INPUT[np.newaxis, :])
             wmatrix[i, j] = w + epsilon
-            b_out = net.feedforward(INPUT)
+            b_out = net.feedforward(INPUT[np.newaxis, :])
             ndadw = (b_out - a_out) / (2 * epsilon)
             wmatrix[i, j] = w
-            net.feedforward(INPUT)  # Refreshes net fanin and activation
+            net.feedforward(INPUT[np.newaxis, :])  # Refreshes net fanin and activation
             adadw = np.array([net.py_dadw(L, q, k, i, j) for q in range(dlayers[-1])])
-            # greatest relative difference
-            diff = max(abs(ndadw - adadw)) / (
-                min(min(abs(ndadw)), min(abs(adadw))) or 1
-            )
-            if diff > maxreldiff:
-                maxreldiff = diff
-                assert maxreldiff < 0.01, f"{maxreldiff=} should be less than 1%"
+            adadw = adadw[np.newaxis, :]
+
+            normalizer = max(norm(adadw), norm(ndadw))
+            if normalizer == 0:
+                continue
+            reldiff = norm(adadw - ndadw) / normalizer
+            if reldiff > maxreldiff:
+                maxreldiff = reldiff
+                assert maxreldiff <= 1e-7, f"{maxreldiff=} is too high"
     print(
         f"[dadw] maxreldiff={maxreldiff * 100:.5f}% between numeric and analytical dadw"
     )
