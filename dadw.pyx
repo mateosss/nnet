@@ -5,7 +5,11 @@
 # TODO: Remove unused underscores
 
 import os
-import numpy as _np  # not as np as we don't want the code getting float64
+import numpy as _np
+# TODO: Importing numpy as _np instead of np like in nnet.py to
+# originally prevent from not putting dtype, but I'm explicitly writing
+# dtype=DTYPE on all calls, decide to rename _np to np, or to do the same
+# as in nnet.py (wrap np partial functions into ones that pass dtype=DTYPE)
 
 from cython.parallel import prange
 
@@ -18,28 +22,31 @@ cdef size_t BATCH_SIZE = 1000 # TODO: Redundant, already in main.py
 assert os.getenv("OMP_NUM_THREADS"), "Unset OMP_NUM_THREADS envvar"
 cdef size_t OMP_NUM_THREADS = int(os.getenv("OMP_NUM_THREADS"))
 
+# NOTE: Change to double and float64 these two lines for float64 usage
+ctypedef float real
 DTYPE = _np.dtype("float32")
+
 cdef size_t DTYPE_SIZE = DTYPE.itemsize
 AXIS = _np.newaxis
 
-cdef float _g(float x) nogil: # TODO: Redundant, already in nnet
-    return 1 / (1 + exp(-x))
+cdef real _g(real x) nogil: # TODO: Redundant, already in nnet
+    return 1 / (1 + exp(-x)) # TODO: exp is for double, use expf for float
 
-cdef float _gprime(float h) nogil: # TODO: Redundant, already in nnet
+cdef real _gprime(real h) nogil: # TODO: Redundant, already in nnet
     return _g(h) * (1 - _g(h))
 
-cdef void zerofill3(float[:, :, ::1] out, size_t X, size_t Y, size_t Z) nogil:
+cdef void zerofill3(real[:, :, ::1] out, size_t X, size_t Y, size_t Z) nogil:
     cdef size_t x, y, z
     for x in prange(X, nogil=True):
         memset(&out[x,0,0], 0, Y * Z * DTYPE_SIZE)
 
-cpdef void matmul(float[:, :] A, float[:, :] B, float[:, :] out):
+cpdef void matmul(real[:, :] A, real[:, :] B, real[:, :] out):
     """matrix multiply A (n x m) and B (m x l) into out (n x l)
     Needed as numpy matmul @ was working unpredictably. See commit bb58858
     Running with `kernprof -l main.py` was faster than running `python main.py`.
     """
     cdef size_t i, j, k
-    cdef float s
+    cdef real s
     cdef size_t n = A.shape[0], m = A.shape[1]
     cdef size_t mm = B.shape[0], l = B.shape[1]
 
@@ -50,7 +57,7 @@ cpdef void matmul(float[:, :] A, float[:, :] B, float[:, :] out):
                 s += A[i, k] * B[k, j]
             out[i, j] = s
 
-cpdef DADW(self, size_t l, size_t q, size_t k, float[:, :, ::1] out):
+cpdef DADW(self, size_t l, size_t q, size_t k, real[:, :, ::1] out):
     """Read only matrix A^{l, q}_k of each derivative of dadw(i, j).
 
     out must be a matrix of size (BATCH_SIZE, n + 1, m) to overwrite.
@@ -60,16 +67,16 @@ cpdef DADW(self, size_t l, size_t q, size_t k, float[:, :, ::1] out):
     cdef size_t m = self.dlayers[k + 1]
     cdef size_t prev_l_sz = self.dlayers[l - 1]
 
-    cdef const float[:, ::1] weights = self.weights[l - 1]
-    cdef const float[:, ::1] fanins = self.fanin[l]
-    cdef const float[:, ::1] fanins_prev = self.fanin[l - 1]
-    cdef const float[:, ::1] activations = self.activations[k]
+    cdef const real[:, ::1] weights = self.weights[l - 1]
+    cdef const real[:, ::1] fanins = self.fanin[l]
+    cdef const real[:, ::1] fanins_prev = self.fanin[l - 1]
+    cdef const real[:, ::1] activations = self.activations[k]
 
     cdef size_t b, i, j
-    cdef float fanin, derivative, activation
-    cdef float fanin_prev, derivative_prev
-    cdef float w
-    cdef const float[:, :, ::1] prev_A
+    cdef real fanin, derivative, activation
+    cdef real fanin_prev, derivative_prev
+    cdef real w
+    cdef const real[:, :, ::1] prev_A
 
     if l == k + 1:
         zerofill3(out, BATCH_SIZE, n + 1, m)
@@ -108,20 +115,20 @@ cpdef DADW(self, size_t l, size_t q, size_t k, float[:, :, ::1] out):
     else:
         raise Exception("This execution branch should not be reached.")
 
-def get_gradients(object self, float[:, ::1] target):
+def get_gradients(object self, real[:, ::1] target):
     """Matrix of each error gradient ∇E^k_{i, j} using DADW() matrices."""
 
     cdef size_t L = len(self.dlayers) - 1  # Last layer index
     cdef size_t sL = self.dlayers[L] # Last layer size
-    cdef float mseconst = 2 / self.dlayers[L]
+    cdef real mseconst = 2 / self.dlayers[L]
     cdef size_t n, m, k, q, b, i, j
 
-    cdef float[:, ::1] outputs = self.activations[L]
-    cdef float[::1] tgtdiff = _np.zeros(BATCH_SIZE, dtype=DTYPE)
-    cdef float[:, :, ::1] summation
-    cdef float[:, :, ::1] ALqk
+    cdef real[:, ::1] outputs = self.activations[L]
+    cdef real[::1] tgtdiff = _np.zeros(BATCH_SIZE, dtype=DTYPE)
+    cdef real[:, :, ::1] summation
+    cdef real[:, :, ::1] ALqk
 
-    cdef float[:, :, :, ::1] cache = DADW_prepopulate(self)
+    cdef real[:, :, :, ::1] cache = DADW_prepopulate(self)
     for q in range(16):
         self._DADW_cache[(2, q, 0)] = cache[q]
 
@@ -149,20 +156,20 @@ def get_gradients(object self, float[:, ::1] target):
     return gradients
 
 cdef void DADW_pre(
-    object self, float [:, :, :, ::1] cache, size_t l, size_t q, size_t k,
+    object self, real [:, :, :, ::1] cache, size_t l, size_t q, size_t k,
     size_t n, size_t m, size_t prev_l_sz,
-    const float[:, ::1] weights,
-    const float[:, ::1] fanins,
-    const float[:, ::1] fanins_prev,
-    const float[:, ::1] activations,
+    const real[:, ::1] weights,
+    const real[:, ::1] fanins,
+    const real[:, ::1] fanins_prev,
+    const real[:, ::1] activations,
 ) nogil:
     "This function is a copy of DADW with for the l == k + 2 case"
 
     cdef size_t b, i, j
-    cdef float fanin, derivative, activation
-    cdef float fanin_prev, derivative_prev
-    cdef float w
-    cdef const float[:, :, ::1] prev_A
+    cdef real fanin, derivative, activation
+    cdef real fanin_prev, derivative_prev
+    cdef real w
+    cdef const real[:, :, ::1] prev_A
 
     # if l == k + 2:
     for b in range(BATCH_SIZE):
@@ -199,7 +206,7 @@ def DADW_prepopulate(self):
     cdef size_t q
     cdef size_t k = 0
 
-    cdef float[:, :, :, ::1] cache = _np.zeros((16, 1000, 785, 16), dtype=DTYPE)
+    cdef real[:, :, :, ::1] cache = _np.zeros((16, 1000, 785, 16), dtype=DTYPE)
     cdef size_t n = self.dlayers[k]
     cdef size_t m = self.dlayers[k + 1]
     cdef size_t prev_l_sz = self.dlayers[l - 1]
@@ -209,10 +216,10 @@ def DADW_prepopulate(self):
     if m % num_threads != 0:
         print(f"[W] m={m} % num_threads={num_threads} != 0, some threads will remain idle while others work")
 
-    cdef const float[:, ::1] weights = self.weights[l - 1]
-    cdef const float[:, ::1] fanins = self.fanin[l]
-    cdef const float[:, ::1] fanins_prev = self.fanin[l - 1]
-    cdef const float[:, ::1] activations = self.activations[k]
+    cdef const real[:, ::1] weights = self.weights[l - 1]
+    cdef const real[:, ::1] fanins = self.fanin[l]
+    cdef const real[:, ::1] fanins_prev = self.fanin[l - 1]
+    cdef const real[:, ::1] activations = self.activations[k]
 
     for q in prange(m, nogil=True, num_threads=num_threads):
         DADW_pre(

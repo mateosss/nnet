@@ -5,6 +5,7 @@ from typing import List, Tuple
 import matplotlib.pyplot as plt
 import numpy as np
 
+DTYPE = np.dtype("float32")
 
 def load(
     dataset: str = "training", batch_size=10, path: str = "./mnist_training_data"
@@ -24,7 +25,7 @@ def load(
         magic, num = struct.unpack(">II", flbl.read(8))
         assert num % batch_size == 0
         lblt = np.fromfile(flbl, dtype=np.int8)
-        lbl = np.zeros((num, 10), dtype=np.float32)
+        lbl = np.zeros((num, 10), dtype=DTYPE)
         for i, row in enumerate(lbl):
             row[lblt[i]] = 1
 
@@ -32,7 +33,7 @@ def load(
         magic, num, rows, cols = struct.unpack(">IIII", fimg.read(16))
         assert num % batch_size == 0
         img = np.fromfile(fimg, dtype=np.uint8)
-        img = img.astype(np.float32)
+        img = img.astype(DTYPE)
         img /= 255
         img.shape = (num, rows * cols)
 
