@@ -250,7 +250,7 @@ class NeuralNetwork:
             gradients[k] = mseconst * summation
         return gradients
 
-    def update_weights(self, gradients, lr=100, momentum=0.9):
+    def update_weights(self, gradients, lr=10, momentum=0.5):
         """Update weights using stochastic gradient decent."""
         prev_grads = self._previous_gradients
         first_run = not any(gm.any() for gm in prev_grads)
