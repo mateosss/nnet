@@ -62,7 +62,7 @@ class Loop:
 def test_get_random_params():
     """It generates reasonable params."""
     dlayers = [1024, 32, 64, 47]
-    nnet = NeuralNetwork(dlayers)
+    nnet = NeuralNetwork(dlayers, batch_size=1)
     params = nnet.get_random_params()
 
     weights = [n * m for n, m in zip(dlayers, dlayers[1:])]
@@ -74,20 +74,19 @@ def test_get_random_params():
 def test_weights_from_params():
     """It reshapes the flat list of params properly."""
     dlayers = [1024, 32, 64, 47]
-    nnet = NeuralNetwork(dlayers)
+    nnet = NeuralNetwork(dlayers, batch_size=1)
     params = nnet.get_random_params()
     weights = nnet.weights_from_params(params)
 
     wsizes = [(n + 1) * m for n, m in zip(dlayers, dlayers[1:])]
 
-    # Weights assertions
     assert len(weights) == len(dlayers) - 1
-    assert all(w.size == wsize for w, wsize in zip(weights, wsizes))
+    assert all(w.size == wsize for w, wsize in zip(weights, wsizes)), "Weights shape"
     assert all(
         w.shape == (dlayers[i - 1] + 1, dlayers[i]) for i, w in enumerate(weights, 1)
-    )
-    assert all(-WTOL <= p <= WTOL for w in weights for p in np.nditer(w))
-    assert all(a[-1] == 1 for a in nnet.activations)
+    ), "Weights shape"
+    assert all(-WTOL <= p <= WTOL for w in weights for p in np.nditer(w)), "Tolerance"
+    assert all(a[0, -1] == 1 for a in nnet.activations), "Bias neuron is not 1"
 
 
 def test_dadw(completeness=COMPLETENESS):
