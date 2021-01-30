@@ -12,7 +12,7 @@ _np.random.seed(1)
 
 # TODO: The DTYPE should be a parameter of NeuralNetwork
 # Use same DTYPE for everything
-DTYPE = _np.dtype("float64")
+DTYPE = _np.dtype("float32")
 Array = Union[_np.ndarray]
 AXIS = _np.newaxis
 array = partial(_np.array, dtype=DTYPE)
