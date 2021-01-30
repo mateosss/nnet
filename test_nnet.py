@@ -11,12 +11,16 @@ from numpy.linalg import norm
 import mnist
 from nnet import NeuralNetwork
 
-# TODO: Comment intent of each individual assertion
-
 np.random.seed(1)  # TODO: Remove?
 WTOL = 10  # weights must be within [-WTOL, +WTOL]
 COMPLETENESS = 0.05  # ratio of loops that will be effectively tested
-BATCH_SIZE = 1
+BATCH_SIZE = 1000
+DTYPE = np.dtype("float32")
+
+# TODO: Needed for now, but it should be a cleaner way to set BATCH_SIZE and DTYPE globally
+assert BATCH_SIZE == 1 and DTYPE == np.dtype(
+    "float64"
+), "Modify all .py[x] files to use BATCH_SIZE = 1 and float64 when testing"
 
 EPOCHS = mnist.load(batch_size=BATCH_SIZE)  # Epoch batches generator
 BATCHES = next(EPOCHS)  # Epoch mini batches
@@ -186,6 +190,7 @@ def test_get_gradients():
     )
     assert np.isclose(new_error, 0)
     assert np.allclose(new_out, TARGET[0])
+
 
 def test_mnist_shuffle():
     a = np.arange(1000)
