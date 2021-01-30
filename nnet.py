@@ -2,6 +2,7 @@ from functools import partial
 from typing import Dict, List, Union
 
 import numpy as _np
+
 # not as np as we don't want the code to use numpy directly
 # because it may be getting undesired float64 unintentionally
 
@@ -11,7 +12,7 @@ _np.random.seed(1)
 
 # TODO: The DTYPE should be a parameter of NeuralNetwork
 # Use same DTYPE for everything
-DTYPE = _np.dtype("float32")
+DTYPE = _np.dtype("float64")
 Array = Union[_np.ndarray]
 AXIS = _np.newaxis
 array = partial(_np.array, dtype=DTYPE)
@@ -64,6 +65,10 @@ class NeuralNetwork:
         params = params if params is not None else self.get_random_params()
         self.weights = self.weights_from_params(params)
 
+        # TODO: Right now self.gradients could be removed as it is not really in use
+        # however it may be useful to repurpose it to be the only malloc made in
+        # the entire run of the network for improved performance
+        # do this when sure that the mallocs are a real bottleneck
         self.gradients = [
             zeros(bshape((n + 1, m))) for n, m in zip(dlayers, dlayers[1:])
         ]
@@ -134,7 +139,7 @@ class NeuralNetwork:
         axis = 1 if self.is_batched else 0
         return ((self.activations[-1][..., :-1] - tgt) ** 2).mean(axis)
 
-    def py_dadw(self, l, q, k, i, j, b=0): # -> DTYPE
+    def py_dadw(self, l, q, k, i, j, b=0):  # -> DTYPE
         """Return derivative of a^l_q with respect to w^k_ij for batch sample b."""
         # Memoization stuff
         args = (l, q, k, i, j)
@@ -180,21 +185,21 @@ class NeuralNetwork:
         self._dadw_cache[args] = res
         return res
 
-    def py_get_gradients(self, target) -> List[Array]:
-        """Matrix of each error gradient ∇E^k_{i, j} using dadw()."""
+    def py_get_gradients(self, target, b=0) -> List[Array]:
+        """Matrix of each error gradient ∇E^k_{i, j} using dadw() for batch sample b."""
         L = len(self.dlayers) - 1  # Last layer index
         mseconst = 2 / self.dlayers[-1]
-        gradients = [zeros_like(wm) for wm in self.weights]
-
+        gradients = [zeros_like(g) for g in self.gradients]
         for k in reversed(range(L)):
-            n, m = self.dlayers[k], self.dlayers[k + 1]
-            for j in range(m):
-                for i in range(n + 1):  # +1 for bias neuron
-                    gradients[k][i, j] = mseconst * sum(
-                        (self.activations[L][q] - target[q])
-                        * self.py_dadw(L, q, k, i, j)
-                        for q in range(self.dlayers[-1])
-                    )
+            for b in range(self.batch_size):
+                n, m = self.dlayers[k], self.dlayers[k + 1]
+                for j in range(m):
+                    for i in range(n + 1):  # +1 for bias neuron
+                        gradients[k][b, i, j] = mseconst * sum(
+                            (self.activations[L][b, q] - target[b, q])
+                            * self.py_dadw(L, q, k, i, j, b=b)
+                            for q in range(self.dlayers[-1])
+                        )
         return gradients
 
     def cy_DADW(self, l, q, k):
@@ -202,6 +207,9 @@ class NeuralNetwork:
 
     def cy_DADW_prepopulate(self):
         return dadw.DADW_prepopulate(self)
+
+    def cy_get_gradients(self, target: Array) -> List[Array]:
+        return dadw.get_gradients(self, target)
 
     def np_DADW(self, l, q, k):
         """Read only matrix A^{l, q}_k of each derivative of dadw(i, j)."""
@@ -231,9 +239,6 @@ class NeuralNetwork:
         self._DADW_cache[args] = res
         return res
 
-    def cy_get_gradients(self, target: Array) -> List[Array]:
-        return dadw.get_gradients(self, target)
-
     def np_get_gradients(self, target: Array) -> List[Array]:
         """Matrix of each error gradient ∇E^k_{i, j} using DADW() matrices."""
 
@@ -250,7 +255,7 @@ class NeuralNetwork:
             for q in range(self.dlayers[L]):
                 tgtdiff = self.activations[L][..., q] - target[..., q]
                 tgtdiff = tgtdiff[..., AXIS, AXIS]
-                ALqk = self.cy_DADW(L, q, k)
+                ALqk = self.np_DADW(L, q, k)
                 summation += tgtdiff * ALqk
             gradients[k] = mseconst * summation
         return gradients

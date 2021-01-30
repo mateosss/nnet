@@ -30,7 +30,7 @@ cdef size_t DTYPE_SIZE = DTYPE.itemsize
 AXIS = _np.newaxis
 
 cdef real _g(real x) nogil: # TODO: Redundant, already in nnet
-    return 1 / (1 + exp(-x)) # TODO: exp is for double, use expf for float
+    return 1 / (1 + exp(-x)) # TODO: exp is for double, use expf for floats, available in newer versions of cython
 
 cdef real _gprime(real h) nogil: # TODO: Redundant, already in nnet
     return _g(h) * (1 - _g(h))
@@ -206,7 +206,7 @@ def DADW_prepopulate(self):
     cdef size_t q
     cdef size_t k = 0
 
-    cdef real[:, :, :, ::1] cache = _np.zeros((16, 1000, 785, 16), dtype=DTYPE)
+    cdef real[:, :, :, ::1] cache = _np.zeros((16, BATCH_SIZE, 785, 16), dtype=DTYPE)
     cdef size_t n = self.dlayers[k]
     cdef size_t m = self.dlayers[k + 1]
     cdef size_t prev_l_sz = self.dlayers[l - 1]

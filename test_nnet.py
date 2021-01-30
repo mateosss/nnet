@@ -16,11 +16,14 @@ from nnet import NeuralNetwork
 np.random.seed(1)  # TODO: Remove?
 WTOL = 10  # weights must be within [-WTOL, +WTOL]
 COMPLETENESS = 0.05  # ratio of loops that will be effectively tested
+BATCH_SIZE = 1
 
-EPOCHS = mnist.load(batch_size=1000)  # Epoch batches generator
+EPOCHS = mnist.load(batch_size=BATCH_SIZE)  # Epoch batches generator
 BATCHES = next(EPOCHS)  # Epoch mini batches
 BATCH = BATCHES[0]
-INPUT, TARGET = BATCH[0][0], BATCH[1][0]  # Single sample used for testing
+# Single sample batch used for testing
+INPUT = BATCH[0][0][np.newaxis, :]
+TARGET = BATCH[1][0][np.newaxis, :]
 
 
 @dataclass
@@ -93,7 +96,7 @@ def test_dadw(completeness=COMPLETENESS):
     """
     dlayers = [784, 16, 16, 10]
     L = len(dlayers) - 1  # Last layer index
-    net = NeuralNetwork(dlayers, batch_size=1)
+    net = NeuralNetwork(dlayers, batch_size=BATCH_SIZE)
 
     # maximum relative difference between numerical and analytical dadw
     maxreldiff = 0
@@ -108,12 +111,12 @@ def test_dadw(completeness=COMPLETENESS):
                 continue
 
             wmatrix[i, j] = w - epsilon
-            a_out = net.feedforward(INPUT[np.newaxis, :])
+            a_out = net.feedforward(INPUT)
             wmatrix[i, j] = w + epsilon
-            b_out = net.feedforward(INPUT[np.newaxis, :])
+            b_out = net.feedforward(INPUT)
             ndadw = (b_out - a_out) / (2 * epsilon)
             wmatrix[i, j] = w
-            net.feedforward(INPUT[np.newaxis, :])  # Refreshes net fanin and activation
+            net.feedforward(INPUT)  # Refreshes net fanin and activation
             adadw = np.array([net.py_dadw(L, q, k, i, j) for q in range(dlayers[-1])])
             adadw = adadw[np.newaxis, :]
 
@@ -138,77 +141,51 @@ def test_get_gradients():
     Check if all the different gradient methods return the same matrix.
     Make one big update with the error gradient and assert it is almost perfect.
     """
-    nnet = NeuralNetwork([784, 16, 16, 10])
+    dlayers = [784, 16, 16, 10]
+    nnet = NeuralNetwork(dlayers, batch_size=BATCH_SIZE)
 
-    old_out = nnet.feedforward(INPUT)
-    old_error = nnet.get_error(TARGET)
-    grads_dadw = nnet.py_get_gradients(TARGET)
-    grads_DADW = nnet.get_gradients(TARGET)
+    old_out = nnet.feedforward(INPUT)[0]
+    old_error = nnet.get_error(TARGET)[0]
+    py_grads = nnet.py_get_gradients(TARGET)
+    np_grads = nnet.np_get_gradients(TARGET)
+    cy_grads = nnet.cy_get_gradients(TARGET)
+
+    maxdiff = 0
+    for k in range(len(dlayers) - 1):
+        n, m = dlayers[k], dlayers[k + 1]
+        for b in range(BATCH_SIZE):
+            for i in range(n + 1):
+                for j in range(m):
+                    pyg = py_grads[k][b, i, j]
+                    npg = np_grads[k][b, i, j]
+                    cyg = cy_grads[k][b, i, j]
+                    diff = max(abs(pyg - npg), abs(pyg - cyg), abs(npg - cyg))
+                    if diff > maxdiff:
+                        maxdiff = diff
 
     assert all(
-        np.allclose(gm, gmf, rtol=0, atol=1e-17)
-        for gm, gmf in zip(grads_dadw, grads_DADW)
+        np.allclose(py_gm, np_gm, rtol=0, atol=1e-17)
+        for py_gm, np_gm in zip(py_grads, np_grads)
+    )
+    assert all(
+        np.allclose(py_gm, cy_gm, rtol=0, atol=1e-17)
+        for py_gm, cy_gm in zip(py_grads, cy_grads)
     )
 
-    for wm, gm in zip(nnet.weights, grads_dadw):
-        wm[...] -= gm * 1000
+    for wm, gm in zip(nnet.weights, py_grads):
+        wm[...] -= gm[0] * 1000
 
-    new_out = nnet.feedforward(INPUT)
-    new_error = nnet.get_error(TARGET)
+    new_out = nnet.feedforward(INPUT)[0]
+    new_error = nnet.get_error(TARGET)[0]
+
     print(
         "[get_gradients] [step] "
         f"{old_error=:.6f}, "
-        f"max{{|old_out - target|}} = {max(abs(old_out - TARGET)):.6f}, "
         f"{new_error=:.6f}, "
-        f"max{{|new_out - target|}} = {max(abs(new_out - TARGET)):.6f}"
+        f"maxdiff between grads is {maxdiff}"
     )
     assert np.isclose(new_error, 0)
-    assert np.allclose(new_out, TARGET)
-
-
-def test_numerical_gradient_checking(completeness=COMPLETENESS):
-    """Compare error with dadw result with slightly moving each parameter.
-
-    Based on https://cs231n.github.io/neural-networks-3/#gradcheck
-    """
-    nnet = NeuralNetwork([784, 16, 16, 10])
-
-    epsilon = 1e-5
-    numgrad = [np.empty(wmatrix.shape) for wmatrix in nnet.weights]
-
-    iterations = 785 * 16 + 17 * 16 + 17 * 10  # hardcoded for specific dlayers
-    loop = Loop("numgrad {} out of {}", 1000, iterations, completeness)
-    for k, wmatrix in enumerate(nnet.weights):
-        for i, w in np.ndenumerate(wmatrix):
-            if not loop():  # Use this to make the test quicker
-                continue
-            wmatrix[i] = w - epsilon
-            nnet.feedforward(INPUT)
-            a = nnet.get_error(TARGET)
-            wmatrix[i] = w + epsilon
-            nnet.feedforward(INPUT)
-            b = nnet.get_error(TARGET)
-            numgrad[k][i] = (b - a) / (2 * epsilon)  # centered formula
-            wmatrix[i] = w
-    error_gradient = nnet.get_gradients(TARGET)
-
-    unit = lambda v: v / norm(v) if (v != 0).any() else np.zeros(v.shape)
-
-    for k in range(len(nnet.weights)):
-        ag = unit(error_gradient[k])
-        ng = unit(numgrad[k])
-        print(f"cs231 = {norm(ag - ng) / max(norm(ag), norm(ng))}")
-        # http://cs231n.github.io/neural-networks-3/#gradcheck
-        # CS231 way seems to not work, because it compares only magnitudes
-        # and not the direction of the analitical and numerical gradients
-        # what happens in this case is that the ag is waaays bigger
-        # than the numerical, however, the direction seems to be pointing
-        # in the same way by my custom and the derived from cs231 formulas
-        # but, as this formulas are out of the hat, I don't know what
-        # would be a good value for them
-        # TODO: Investigate for a good formula, and what result to expect
-        # TODO: Put a proper assertion in this test following that formula
-
+    assert np.allclose(new_out, TARGET[0])
 
 def test_mnist_shuffle():
     a = np.arange(1000)
