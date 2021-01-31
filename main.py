@@ -11,6 +11,7 @@ from nnet import NeuralNetwork
 # TODO: Add argparse options to configure the run
 
 DLAYERS = [784, 64, 784]
+SAVE_FILE = "params.npy"
 EPOCHS = 16
 BATCH_SIZE = 1000
 
@@ -23,15 +24,12 @@ LOG_FREQ = LOG_SAMPLE_FREQ / BATCH_SIZE  # How many batches between logs
 
 # TODO: Save runs to a separate folder and don't overwrite them
 def save_params(params):
-    with open("best.py", "w") as f:  # TODO: What a way to save data :)
-        f.write(f"params = {str(params.tolist())}")
-
+    with open(SAVE_FILE, 'wb') as f:
+        np.save(f, params)
 
 def load_params():
-    # TODO: Stop using best.py for saving # pylint: disable=E0401
-    from best import params
-
-    return np.array(params)
+    with open(SAVE_FILE, 'rb') as f:
+        return np.load(f)
 
 
 def genetic_main():
