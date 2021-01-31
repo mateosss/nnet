@@ -68,8 +68,8 @@ cpdef DADW(self, size_t l, size_t q, size_t k, real[:, :, ::1] out):
     cdef size_t prev_l_sz = self.dlayers[l - 1]
 
     cdef const real[:, ::1] weights = self.weights[l - 1]
-    cdef const real[:, ::1] fanins = self.fanin[l]
-    cdef const real[:, ::1] fanins_prev = self.fanin[l - 1]
+    cdef const real[:, ::1] fanins = self.fanins[l]
+    cdef const real[:, ::1] fanins_prev = self.fanins[l - 1]
     cdef const real[:, ::1] activations = self.activations[k]
 
     cdef size_t b, i, j
@@ -217,8 +217,8 @@ def DADW_prepopulate(self):
         print(f"[W] m={m} % num_threads={num_threads} != 0, some threads will remain idle while others work")
 
     cdef const real[:, ::1] weights = self.weights[l - 1]
-    cdef const real[:, ::1] fanins = self.fanin[l]
-    cdef const real[:, ::1] fanins_prev = self.fanin[l - 1]
+    cdef const real[:, ::1] fanins = self.fanins[l]
+    cdef const real[:, ::1] fanins_prev = self.fanins[l - 1]
     cdef const real[:, ::1] activations = self.activations[k]
 
     for q in prange(m, nogil=True, num_threads=num_threads):

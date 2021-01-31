@@ -37,7 +37,7 @@ class NeuralNetwork:
     activations: List  # List of (batch_size, n + 1) arrays. The value of a neuron
 
     gradients: List  # List of (batch_size, n + 1, m). Error gradients for each weight
-    fanin: List  # List of (batch_size, n) arrays. The linear input for a neuron
+    fanins: List  # List of (batch_size, n) arrays. The linear input for a neuron
 
     _dadw_cache: Dict
     _DADW_cache: Dict
@@ -52,7 +52,7 @@ class NeuralNetwork:
         self.batch_size = batch_size
 
         # Set neurons
-        self.fanin = [zeros((batch_size, n)) for n in [0] + dlayers[1:]]
+        self.fanins = [zeros((batch_size, n)) for n in [0] + dlayers[1:]]
         self.activations = [zeros((batch_size, n + 1)) for n in dlayers]
         for k in range(len(dlayers)):
             self.activations[k][:, -1] = 1  # Bias neurons are 1
@@ -126,8 +126,8 @@ class NeuralNetwork:
         for k in range(1, len(self.dlayers)):
             # TODO: Numpy matmul @ should be used here, however see cython matmul docstring
             # self.fanin[k] = self.activations[k - 1] @ self.weights[k - 1]
-            dadw.matmul(self.activations[k - 1], self.weights[k - 1], self.fanin[k])
-            self.activations[k][:, :-1] = g(self.fanin[k])
+            dadw.matmul(self.activations[k - 1], self.weights[k - 1], self.fanins[k])
+            self.activations[k][:, :-1] = g(self.fanins[k])
         return self.activations[-1][:, :-1].copy()  # Remove bias neuron from result
 
     def get_error(self, tgt: Array):  # (batch_size, #L) -> (#L,)
@@ -162,7 +162,7 @@ class NeuralNetwork:
         elif k == l - 2:  # Special case for performance, not needed for correctness
             res = (
                 self.weights[l - 1][j, q]
-                * gprime(self.fanin[l - 1][b, j])
+                * gprime(self.fanins[l - 1][b, j])
                 * self.activations[k][b, i]
             )
         elif k < l - 1:
@@ -174,7 +174,7 @@ class NeuralNetwork:
             raise Exception("Should never reach this execution branch")
 
         # Multiply by derivative of activation function over the neuron's weighted sum
-        res *= gprime(self.fanin[l][b, q])
+        res *= gprime(self.fanins[l][b, q])
 
         # Cache it
         self._dadw_cache[args] = res
@@ -214,13 +214,13 @@ class NeuralNetwork:
 
         res = zeros_like(self.gradients[k])  # (batch_size, n + 1, m)
         if l == k + 1:
-            derivatives = gprime(self.fanin[l][:, q, AXIS])
+            derivatives = gprime(self.fanins[l][:, q, AXIS])
             columns = self.activations[k][:]
             res[:, :, q] = derivatives * columns
         elif l > k + 1:
             for r in range(self.dlayers[l - 1]):
                 res += self.weights[l - 1][r, q] * self.np_DADW(l - 1, r, k)
-            derivatives = gprime(self.fanin[l][:, q, AXIS, AXIS])
+            derivatives = gprime(self.fanins[l][:, q, AXIS, AXIS])
             res[:] *= derivatives
         else:
             raise Exception("This execution branch should not be reached.")
