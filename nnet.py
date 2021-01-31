@@ -41,7 +41,7 @@ class NeuralNetwork:
 
     _dadw_cache: Dict
     _DADW_cache: Dict
-    _previous_gradients: List
+    _velocities: List # Previous velocities for SGD momentum
 
     def __init__(self, dlayers: List[int], batch_size: int, params: List[int] = None):
         """
@@ -71,7 +71,7 @@ class NeuralNetwork:
 
         self._dadw_cache = {}
         self._DADW_cache = {}
-        self._previous_gradients = [zeros_like(wm) for wm in self.weights]
+        self._velocities = [zeros_like(wm) for wm in self.weights]
 
     # TODO: Understand and try other initializations as xavier and kaiming
     # see https://towardsdatascience.com/weight-initialization-in-neural-networks-a-journey-from-the-basics-to-kaiming-954fb9b47c79
@@ -251,14 +251,13 @@ class NeuralNetwork:
         return gradients
 
     def update_weights(self, gradients, lr=10, momentum=0.5):
-        """Update weights using stochastic gradient decent."""
-        prev_grads = self._previous_gradients
-        first_run = not any(gm.any() for gm in prev_grads)
-        if first_run:
-            momentum = 0
-        for wm, gm, pgm in zip(self.weights, gradients, prev_grads):
-            wm[:, :] -= lr * gm * (1 - momentum) + pgm * momentum
-        self._previous_gradients = gradients
+        """Update weights using stochastic gradient decent with momentum.
+
+        Reference: http://www.cs.toronto.edu/~hinton/absps/momentum.pdf
+        """
+        for wm, gm, vm in zip(self.weights, gradients, self._velocities):
+            vm[:, :] = -lr * gm + momentum * vm
+            wm[:, :] += vm
 
     def batch_eval(self, batch, grads=True, hitrate=False):
         """Return mean losses, mean gradients (if grads) and hitrate (if hitrate) of a batch.
