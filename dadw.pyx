@@ -1,4 +1,4 @@
-# distutils: extra_compile_args=-fopenmp -Ofast -march=native
+# distutils: extra_compile_args=-fopenmp -Ofast -g0 -march=native
 # distutils: extra_link_args=-fopenmp
 # cython: language_level=3, boundscheck=False, wraparound=False
 
@@ -35,10 +35,8 @@ cdef real _g(real x) nogil: # TODO: Redundant, already in nnet
 cdef real _gprime(real h) nogil: # TODO: Redundant, already in nnet
     return _g(h) * (1 - _g(h))
 
-cdef void zerofill3(real[:, :, ::1] out, size_t X, size_t Y, size_t Z) nogil:
-    cdef size_t x, y, z
-    for x in prange(X, nogil=True):
-        memset(&out[x,0,0], 0, Y * Z * DTYPE_SIZE)
+cdef void nop_zerofill3(real[:, :, ::1] out, size_t X, size_t Y, size_t Z) nogil:
+    memset(&out[0,0,0], 0, X * Y * Z * DTYPE_SIZE)
 
 cpdef void matmul(real[:, :] A, real[:, :] B, real[:, :] out):
     """matrix multiply A (n x m) and B (m x l) into out (n x l)
@@ -57,20 +55,24 @@ cpdef void matmul(real[:, :] A, real[:, :] B, real[:, :] out):
                 s += A[i, k] * B[k, j]
             out[i, j] = s
 
-cpdef DADW(self, size_t l, size_t q, size_t k, real[:, :, ::1] out):
+cdef void DADW(
+    const real[:, :, :, ::1] cache,
+    size_t l,
+    size_t q,
+    size_t k,
+    real[:, :, ::1] out,
+    size_t n,
+    size_t m,
+    size_t prev_l_sz,
+    const real[:, ::1] weights,
+    const real[:, ::1] fanins,
+    const real[:, ::1] fanins_prev,
+    const real[:, ::1] activations
+) nogil:
     """Read only matrix A^{l, q}_k of each derivative of dadw(i, j).
 
     out must be a matrix of size (BATCH_SIZE, n + 1, m) to overwrite.
     """
-
-    cdef size_t n = self.dlayers[k]
-    cdef size_t m = self.dlayers[k + 1]
-    cdef size_t prev_l_sz = self.dlayers[l - 1]
-
-    cdef const real[:, ::1] weights = self.weights[l - 1]
-    cdef const real[:, ::1] fanins = self.fanins[l]
-    cdef const real[:, ::1] fanins_prev = self.fanins[l - 1]
-    cdef const real[:, ::1] activations = self.activations[k]
 
     cdef size_t b, i, j
     cdef real fanin, derivative, activation
@@ -79,15 +81,15 @@ cpdef DADW(self, size_t l, size_t q, size_t k, real[:, :, ::1] out):
     cdef const real[:, :, ::1] prev_A
 
     if l == k + 1:
-        zerofill3(out, BATCH_SIZE, n + 1, m)
-        for b in prange(BATCH_SIZE, nogil=True):
+        nop_zerofill3(out, BATCH_SIZE, n + 1, m)
+        for b in range(BATCH_SIZE):
             fanin = fanins[b, q]
             derivative = _gprime(fanin)
             for i in range(n + 1):
                 activation = activations[b, i]
                 out[b, i, q] = derivative * activation
     elif l == k + 2:
-        for b in prange(BATCH_SIZE, nogil=True):
+        for b in range(BATCH_SIZE):
             fanin = fanins[b, q]
             derivative = _gprime(fanin)
             for i in range(n + 1):
@@ -98,28 +100,27 @@ cpdef DADW(self, size_t l, size_t q, size_t k, real[:, :, ::1] out):
                     w = weights[j, q]
                     out[b, i, j] = derivative * w * derivative_prev * activation
     elif l > k + 1:
-        zerofill3(out, BATCH_SIZE, n + 1, m)
+        nop_zerofill3(out, BATCH_SIZE, n + 1, m)
         for r in range(prev_l_sz):
-            prev_A = self._DADW_cache[(l - 1, r, k)]
             w = weights[r, q]
-            for b in prange(BATCH_SIZE, nogil=True):
+            for b in range(BATCH_SIZE):
                 for i in range(n + 1):
                     for j in range(m):
-                        out[b, i, j] += w * prev_A[b, i, j]
+                        out[b, i, j] += w * cache[q, b, i, j]
         for b in range(BATCH_SIZE):
             fanin = fanins[b, q]
             derivative = _gprime(fanin)
             for i in range(n + 1):
                 for j in range(m):
                     out[b, i, j] *= derivative
-    else:
-        raise Exception("This execution branch should not be reached.")
 
-def get_gradients(object self, real[:, ::1] target):
+
+def get_gradients(object self, const real[:, ::1] target):
     """Matrix of each error gradient ∇E^k_{i, j} using DADW() matrices."""
 
     cdef size_t L = len(self.dlayers) - 1  # Last layer index
     cdef size_t sL = self.dlayers[L] # Last layer size
+    cdef size_t prev_l_sz = self.dlayers[L - 1]
     cdef real mseconst = 2 / self.dlayers[L]
     cdef size_t n, m, k, q, b, i, j
 
@@ -133,6 +134,7 @@ def get_gradients(object self, real[:, ::1] target):
     cdef real[:, ::1] activationKK = self.activations[KK]
     cdef real[:, ::1] activationK = self.activations[K]
     cdef real[:, ::1] weightK = self.weights[K]
+    cdef const real[:, ::1] activations
 
     cdef real[::1] tgtdiff = _np.zeros(BATCH_SIZE, dtype=DTYPE)
     cdef real[:, :, ::1] summation
@@ -177,15 +179,15 @@ def get_gradients(object self, real[:, ::1] target):
 
     # Compute remaining layers (if any)
     for k in reversed(range(k)):
+        activations = self.activations[k]
         summation = _np.zeros_like(self.gradients[k], dtype=DTYPE)  # (batch_size, n + 1, m)
         ALqk = _np.zeros_like(self.gradients[k], dtype=DTYPE)
         n = self.dlayers[k]
         m = self.dlayers[k + 1]
-        for q in range(sL):
+        for q in prange(sL, nogil=True):
+            DADW(cache, L, q, k, ALqk, n, m, prev_l_sz, weightK, faninL, faninK, activations)
             for b in range(BATCH_SIZE):
                 tgtdiff[b] = outputs[b, q] - target[b, q]
-            DADW(self, L, q, k, ALqk)
-            for b in prange(BATCH_SIZE, nogil=True):
                 for i in range(n + 1):
                     for j in range(m):
                         summation[b, i, j] += tgtdiff[b] * ALqk[b, i, j]
