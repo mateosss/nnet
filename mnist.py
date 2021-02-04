@@ -1,15 +1,14 @@
 import os
 import struct
-from typing import List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
 
 DTYPE = np.dtype("float32")
+MNIST_PATH = "./mnist_training_data"
 
-def load(
-    dataset: str = "training", batch_size=10, path: str = "./mnist_training_data"
-) -> List[Tuple[np.array, np.array]]:
+
+def load(dataset="training", batch_size=10, path=MNIST_PATH):
     """Import and process mnist dataset.
     Return generator of lists of batches
     with batch shape: (images: batch_size x 784, labels: batch_size x 10)

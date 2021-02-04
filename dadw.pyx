@@ -119,6 +119,8 @@ def get_gradients(object self, real[:, ::1] target):
 
     cdef real[:, ::1] outputs = self.activations[L]
     cdef real[:, :, ::1] ALqk
+    cdef real[:, :, ::1] grads_k
+    cdef real[::1] tgtdiff = np.zeros(BATCH_SIZE, dtype=DTYPE)
 
     cdef size_t K = L - 1, KK = L - 2
     cdef real aKi, ghKj, summ = 0 # summ = 0 needed or cython complains
@@ -128,36 +130,30 @@ def get_gradients(object self, real[:, ::1] target):
     cdef real[:, ::1] activationK = self.activations[K]
     cdef real[:, ::1] weightK = self.weights[K]
 
-    cdef real[::1] tgtdiff = np.zeros(BATCH_SIZE, dtype=DTYPE)
-    cdef real[:, :, ::1] summation
-
     cdef real[:, :, :, ::1] cache = DADW_prepopulate(self)
     for q in range(16):
         self._DADW_cache[(2, q, 0)] = cache[q]
-
-    gradients = [None for _ in self.weights]
 
     # Explicit layer k=L-1 (last weights layer) for better performance
     # especially with networks with big output layers like autoencoders
     k = L - 1
     n = self.dlayers[k]
     m = self.dlayers[k + 1]
-    ALqk = np.empty((BATCH_SIZE, n + 1, m), dtype=DTYPE)
+    grads_k = self._gradients[k]
     for b in prange(BATCH_SIZE, nogil=True):
         for i in range(n + 1):
             aKi = activationK[b, i]
             for j in range(m):
-                ALqk[b, i, j] = (
+                grads_k[b, i, j] = (
                     mseconst * (outputs[b, j] - target[b, j])
                     * gprime(faninL[b, j]) * aKi
                 )
-    gradients[k] = np.asarray(ALqk)
 
     # Explicit layer k=L-2 for better performance, same performance reason as K=L-1
     k = L - 2
     n = self.dlayers[k]
     m = self.dlayers[k + 1]
-    ALqk = np.empty((BATCH_SIZE, n + 1, m), dtype=DTYPE)
+    grads_k = self._gradients[k]
     for b in prange(BATCH_SIZE, nogil=True):
         for j in range(m):
             summ = 0
@@ -165,16 +161,16 @@ def get_gradients(object self, real[:, ::1] target):
                 summ += (outputs[b, q] - target[b, q]) * gprime(faninL[b, q]) * weightK[j, q]
             ghKj = gprime(faninK[b, j])
             for i in range(n + 1):
-                ALqk[b, i, j] = mseconst * ghKj * activationKK[b, i]
-                ALqk[b, i, j] *= summ # NOTE: *= needed or cython complains
-    gradients[k] = np.asarray(ALqk)
+                grads_k[b, i, j] = mseconst * ghKj * activationKK[b, i]
+                grads_k[b, i, j] *= summ # NOTE: *= needed or cython complains
 
     # Compute remaining layers (if any)
     for k in reversed(range(k)):
-        summation = np.zeros_like(self.gradients[k], dtype=DTYPE)  # (batch_size, n + 1, m)
-        ALqk = np.zeros_like(self.gradients[k], dtype=DTYPE)
         n = self.dlayers[k]
         m = self.dlayers[k + 1]
+        ALqk = np.zeros_like(self._gradients[k], dtype=DTYPE)
+        grads_k = self._gradients[k]
+        zerofill3(grads_k, BATCH_SIZE, n + 1, m)
         for q in range(sL):
             for b in range(BATCH_SIZE):
                 tgtdiff[b] = outputs[b, q] - target[b, q]
@@ -182,14 +178,13 @@ def get_gradients(object self, real[:, ::1] target):
             for b in prange(BATCH_SIZE, nogil=True):
                 for i in range(n + 1):
                     for j in range(m):
-                        summation[b, i, j] += tgtdiff[b] * ALqk[b, i, j]
+                        grads_k[b, i, j] += tgtdiff[b] * ALqk[b, i, j]
         for b in prange(BATCH_SIZE, nogil=True):
             for i in range(n + 1):
                 for j in range(m):
-                    summation[b, i, j] *= mseconst
-        gradients[k] = np.asarray(summation)
+                    grads_k[b, i, j] *= mseconst
 
-    return gradients
+    return self._gradients
 
 cdef void DADW_pre(
     object self, real [:, :, :, ::1] cache, size_t l, size_t q, size_t k,
