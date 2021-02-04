@@ -2,14 +2,8 @@
 # distutils: extra_link_args=-fopenmp
 # cython: language_level=3, boundscheck=False, wraparound=False
 
-# TODO: Remove unused underscores
-
 import os
-import numpy as _np
-# TODO: Importing numpy as _np instead of np like in nnet.py to
-# originally prevent from not putting dtype, but I'm explicitly writing
-# dtype=DTYPE on all calls, decide to rename _np to np, or to do the same
-# as in nnet.py (wrap np partial functions into ones that pass dtype=DTYPE)
+import numpy as np
 
 from cython.parallel import prange
 
@@ -24,16 +18,16 @@ cdef size_t OMP_NUM_THREADS = int(os.getenv("OMP_NUM_THREADS"))
 
 # NOTE: Change to double and float64 these two lines for float64 usage
 ctypedef float real
-DTYPE = _np.dtype("float32")
+DTYPE = np.dtype("float32")
 
 cdef size_t DTYPE_SIZE = DTYPE.itemsize
-AXIS = _np.newaxis
+AXIS = np.newaxis
 
-cdef real _g(real x) nogil: # TODO: Redundant, already in nnet
+cdef real g(real x) nogil: # TODO: Redundant, already in nnet
     return 1 / (1 + exp(-x)) # TODO: exp is for double, use expf for floats, available in newer versions of cython
 
-cdef real _gprime(real h) nogil: # TODO: Redundant, already in nnet
-    return _g(h) * (1 - _g(h))
+cdef real gprime(real h) nogil: # TODO: Redundant, already in nnet
+    return g(h) * (1 - g(h))
 
 cdef void zerofill3(real[:, :, ::1] out, size_t X, size_t Y, size_t Z) nogil:
     cdef size_t x, y, z
@@ -82,19 +76,19 @@ cpdef DADW(self, size_t l, size_t q, size_t k, real[:, :, ::1] out):
         zerofill3(out, BATCH_SIZE, n + 1, m)
         for b in prange(BATCH_SIZE, nogil=True):
             fanin = fanins[b, q]
-            derivative = _gprime(fanin)
+            derivative = gprime(fanin)
             for i in range(n + 1):
                 activation = activations[b, i]
                 out[b, i, q] = derivative * activation
     elif l == k + 2:
         for b in prange(BATCH_SIZE, nogil=True):
             fanin = fanins[b, q]
-            derivative = _gprime(fanin)
+            derivative = gprime(fanin)
             for i in range(n + 1):
                 activation = activations[b, i]
                 for j in range(m):
                     fanin_prev = fanins_prev[b, j]
-                    derivative_prev = _gprime(fanin_prev)
+                    derivative_prev = gprime(fanin_prev)
                     w = weights[j, q]
                     out[b, i, j] = derivative * w * derivative_prev * activation
     elif l > k + 1:
@@ -108,7 +102,7 @@ cpdef DADW(self, size_t l, size_t q, size_t k, real[:, :, ::1] out):
                         out[b, i, j] += w * prev_A[b, i, j]
         for b in range(BATCH_SIZE):
             fanin = fanins[b, q]
-            derivative = _gprime(fanin)
+            derivative = gprime(fanin)
             for i in range(n + 1):
                 for j in range(m):
                     out[b, i, j] *= derivative
@@ -134,7 +128,7 @@ def get_gradients(object self, real[:, ::1] target):
     cdef real[:, ::1] activationK = self.activations[K]
     cdef real[:, ::1] weightK = self.weights[K]
 
-    cdef real[::1] tgtdiff = _np.zeros(BATCH_SIZE, dtype=DTYPE)
+    cdef real[::1] tgtdiff = np.zeros(BATCH_SIZE, dtype=DTYPE)
     cdef real[:, :, ::1] summation
 
     cdef real[:, :, :, ::1] cache = DADW_prepopulate(self)
@@ -148,37 +142,37 @@ def get_gradients(object self, real[:, ::1] target):
     k = L - 1
     n = self.dlayers[k]
     m = self.dlayers[k + 1]
-    ALqk = _np.empty((BATCH_SIZE, n + 1, m), dtype=DTYPE)
+    ALqk = np.empty((BATCH_SIZE, n + 1, m), dtype=DTYPE)
     for b in prange(BATCH_SIZE, nogil=True):
         for i in range(n + 1):
             aKi = activationK[b, i]
             for j in range(m):
                 ALqk[b, i, j] = (
                     mseconst * (outputs[b, j] - target[b, j])
-                    * _gprime(faninL[b, j]) * aKi
+                    * gprime(faninL[b, j]) * aKi
                 )
-    gradients[k] = _np.asarray(ALqk)
+    gradients[k] = np.asarray(ALqk)
 
     # Explicit layer k=L-2 for better performance, same performance reason as K=L-1
     k = L - 2
     n = self.dlayers[k]
     m = self.dlayers[k + 1]
-    ALqk = _np.empty((BATCH_SIZE, n + 1, m), dtype=DTYPE)
+    ALqk = np.empty((BATCH_SIZE, n + 1, m), dtype=DTYPE)
     for b in prange(BATCH_SIZE, nogil=True):
         for j in range(m):
             summ = 0
             for q in range(sL):
-                summ += (outputs[b, q] - target[b, q]) * _gprime(faninL[b, q]) * weightK[j, q]
-            ghKj = _gprime(faninK[b, j])
+                summ += (outputs[b, q] - target[b, q]) * gprime(faninL[b, q]) * weightK[j, q]
+            ghKj = gprime(faninK[b, j])
             for i in range(n + 1):
                 ALqk[b, i, j] = mseconst * ghKj * activationKK[b, i]
                 ALqk[b, i, j] *= summ # NOTE: *= needed or cython complains
-    gradients[k] = _np.asarray(ALqk)
+    gradients[k] = np.asarray(ALqk)
 
     # Compute remaining layers (if any)
     for k in reversed(range(k)):
-        summation = _np.zeros_like(self.gradients[k], dtype=DTYPE)  # (batch_size, n + 1, m)
-        ALqk = _np.zeros_like(self.gradients[k], dtype=DTYPE)
+        summation = np.zeros_like(self.gradients[k], dtype=DTYPE)  # (batch_size, n + 1, m)
+        ALqk = np.zeros_like(self.gradients[k], dtype=DTYPE)
         n = self.dlayers[k]
         m = self.dlayers[k + 1]
         for q in range(sL):
@@ -193,7 +187,7 @@ def get_gradients(object self, real[:, ::1] target):
             for i in range(n + 1):
                 for j in range(m):
                     summation[b, i, j] *= mseconst
-        gradients[k] = _np.asarray(summation)
+        gradients[k] = np.asarray(summation)
 
     return gradients
 
@@ -216,12 +210,12 @@ cdef void DADW_pre(
     # if l == k + 2:
     for b in range(BATCH_SIZE):
         fanin = fanins[b, q]
-        derivative = _gprime(fanin)
+        derivative = gprime(fanin)
         for i in range(n + 1):
             activation = activations[b, i]
             for j in range(m):
                 fanin_prev = fanins_prev[b, j]
-                derivative_prev = _gprime(fanin_prev)
+                derivative_prev = gprime(fanin_prev)
                 w = weights[j, q]
                 cache[q, b, i, j] = derivative * w * derivative_prev * activation
 
@@ -248,7 +242,7 @@ def DADW_prepopulate(self):
     cdef size_t q
     cdef size_t k = 0
 
-    cdef real[:, :, :, ::1] cache = _np.zeros((16, BATCH_SIZE, 785, 16), dtype=DTYPE)
+    cdef real[:, :, :, ::1] cache = np.zeros((16, BATCH_SIZE, 785, 16), dtype=DTYPE)
     cdef size_t n = self.dlayers[k]
     cdef size_t m = self.dlayers[k + 1]
     cdef size_t prev_l_sz = self.dlayers[l - 1]
