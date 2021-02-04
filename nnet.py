@@ -30,12 +30,11 @@ gprime = lambda h: g(h) * (1 - g(h))  # g'(in^l_q)
 
 
 class NeuralNetwork:
-    # Note: under current layer k: read comments as if n, m = dlayers[k], dlayers[k + 1]
+    # NOTE: read comments as if n, m = dlayers[k], dlayers[k + 1]
     dlayers: List[int]  # Layer description
     batch_size: int  # Amount of samples to process together
     weights: List  # List of (n + 1, m) arrays (+1 for bias). The synaptic efficacy
     activations: List  # List of (batch_size, n + 1) arrays. The value of a neuron
-
     fanins: List  # List of (batch_size, n) arrays. The linear input for a neuron
 
     _dadw_cache: Dict
@@ -138,10 +137,10 @@ class NeuralNetwork:
             return self._dadw_cache[args]
 
         # Range assertions
-        assert l >= 0 and l < len(self.dlayers), f"out of range {l=}"
-        assert k >= 0 and k < len(self.dlayers), f"out of range {k=}"
-        assert i >= 0 and i < self.activations[k].size, f"out of range {i=}"
-        assert j >= 0 and j < self.dlayers[k], f"out of range {j=}"
+        assert 0 <= l < len(self.dlayers), f"out of range {l=}"
+        assert 0 <= k < len(self.dlayers), f"out of range {k=}"
+        assert 0 <= i < self.activations[k].size, f"out of range {i=}"
+        assert 0 <= j < self.dlayers[k], f"out of range {j=}"
 
         # Usage assertions
         # while dadw is theoretically defined as 0 for these, we don't want them to run
@@ -237,7 +236,7 @@ class NeuralNetwork:
                 ALqk = self.np_DADW(L, q, k)
                 summation += tgtdiff * ALqk
             self._gradients[k] = mseconst * summation
-        return self.activationsgradients
+        return self._gradients
 
     def update_weights(self, gradients, lr=10, momentum=0.5):
         """Update weights using stochastic gradient decent with momentum.

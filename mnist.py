@@ -21,7 +21,7 @@ def load(dataset="training", batch_size=10, path=MNIST_PATH):
     fname_lbl = os.path.join(path, f"{prefix}-labels-idx1-ubyte")
 
     with open(fname_lbl, "rb") as flbl:
-        magic, num = struct.unpack(">II", flbl.read(8))
+        _, num = struct.unpack(">II", flbl.read(8)) # _ is a magic number
         assert num % batch_size == 0
         lblt = np.fromfile(flbl, dtype=np.int8)
         lbl = np.zeros((num, 10), dtype=DTYPE)
@@ -29,7 +29,7 @@ def load(dataset="training", batch_size=10, path=MNIST_PATH):
             row[lblt[i]] = 1
 
     with open(fname_img, "rb") as fimg:
-        magic, num, rows, cols = struct.unpack(">IIII", fimg.read(16))
+        _, num, rows, cols = struct.unpack(">IIII", fimg.read(16))
         assert num % batch_size == 0
         img = np.fromfile(fimg, dtype=np.uint8)
         img = img.astype(DTYPE)
