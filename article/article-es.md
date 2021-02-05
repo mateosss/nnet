@@ -97,7 +97,7 @@ En donde
   de error.
 
 Siguiendo la derivación desde este punto se llega a plantear los
-gradientes de la capa $k$ en función de los de los términos de error de la
+gradientes de la capa $k$ en función de los términos de error de la
 capa posterior $\delta^{k+1}_j$ y es de esta forma que barriendo desde la
 salida hacia la entrada propagando los términos de error es posible calcular
 todos los gradientes, de aquí el nombre *backpropagation*. Veremos que, por el
@@ -108,37 +108,55 @@ coloquialmente a su implementación *frontpropagation* (no confundir con el
 
 ---
 
-Continuando desde $(1)$ es posible ver que se necesitará analizar $\frac {\partial a^l_q} {\partial w^k_{ij}}$ con $l = 0, \ldots, L$, es decir cómo afecta el peso $w^k_{ij}$ a la neurona $a^l_q$, para poder calcular $\frac {\partial a^L_q} {\partial w^k_{ij}}$. Con
+Continuando desde $(1)$ es posible ver que se necesitará analizar $\frac
+{\partial a^l_q} {\partial w^k_{ij}}$ con $l = 0, \ldots, L$, es decir cómo
+afecta el peso $w^k_{ij}$ a la neurona $a^l_q$, para poder calcular $\frac
+{\partial a^L_q} {\partial w^k_{ij}}$. Con
 
 - $g$: función de activación utilizada en todas las capas.
 
-Estamos ahora en posición de analizar por casos el valor de $\frac {\partial a^l_q} {\partial w^k_{ij}}$.
+Estamos ahora en posición de analizar por casos el valor de $\frac {\partial
+a^l_q} {\partial w^k_{ij}}$.
 
-- Si $l = 0$ (capa de entrada) $\Rightarrow \frac {\partial a^0_q} {\partial w^k_{ij}}$ ya que $a^0_q \equiv 0$
+- Si $l = 0$ (capa de entrada) $\Rightarrow \frac {\partial a^0_q} {\partial
+  w^k_{ij}}$ ya que $a^0_q \equiv 0$
 
-- Sino, si $q = \#l$ (neurona de bias) $\Rightarrow \frac {\partial a^l_q} {\partial w^k_{ij}} = 0$ ya que la neurona bias es constantemente 1.
+- Sino, si $q = \#l$ (neurona de bias) $\Rightarrow \frac {\partial a^l_q}
+  {\partial w^k_{ij}} = 0$ ya que la neurona bias es constantemente 1.
 
-- Sino, si $k \ge l$ (peso posterior a neurona) $\Rightarrow \frac {\partial a^l_q} {\partial w^k_{ij}} = 0$ ya que un peso posterior no influye en el valor de activación.
+- Sino, si $k \ge l$ (peso posterior a neurona) $\Rightarrow \frac {\partial
+  a^l_q} {\partial w^k_{ij}} = 0$ ya que un peso posterior no influye en el
+  valor de activación.
 
-- Sino, si $k = l - 1$ (peso inmediato a la neurona) $\Rightarrow \frac {\partial a^l_q} {\partial w^k_{ij}} = g'(h^l_q) \frac {\partial h^l_q} {\partial w^k_{ij}}$
+- Sino, si $k = l - 1$ (peso inmediato a la neurona) $\Rightarrow \frac
+  {\partial a^l_q} {\partial w^k_{ij}} = g'(h^l_q) \frac {\partial h^l_q}
+  {\partial w^k_{ij}}$
 
     En este caso como
 
     $$h^l_q = \sum_{r=0}^{\# (l - 1)} a^{l-1}_r w^{l-1}_{rq}$$
 
-    Dividimos en dos subcasos para determinar la derivada parcial $\frac {\partial h^l_q} {\partial w^k_{ij}}$, cuando el peso llega a la neurona $q$ y cuando no, es decir:
+    Dividimos en dos subcasos para determinar la derivada parcial $\frac {\partial h^l_q} {\partial w^k_{ij}}$, cuando el peso llega a la neurona $q$ y cuando no, lo que resulta en:
 
-    - Si $j = q \Rightarrow \frac {\partial a^l_q} {\partial w^k_{ij}} = g'(h^l_q) \cdot a^k_i$
+    - Si $j = q \Rightarrow \frac {\partial a^l_q} {\partial w^k_{ij}} =
+      g'(h^l_q) \cdot a^k_i$
 
-    - Si $j \ne q \Rightarrow \frac {\partial a^l_q} {\partial w^k_{ij}} = g'(h^l_q) \cdot 0 = 0$
+    - Si $j \ne q \Rightarrow \frac {\partial a^l_q} {\partial w^k_{ij}} =
+      g'(h^l_q) \cdot 0 = 0$
 
-- Sino, si $k \lt l - 1$ (peso no inmediato a la neurona) $\Rightarrow \frac {\partial a^l_q} {\partial w^k_{ij}} = g'(h^l_q) \cdot \sum^{*(l-1)}_{r=0}{w^{l-1}_{rq} \frac {\partial a^{l-1}_r} {\partial w^k_{ij}}}$
+- Sino, si $k < l - 1$ (peso no inmediato a la neurona) $\Rightarrow \frac
+  {\partial a^l_q} {\partial w^k_{ij}} = g'(h^l_q) \cdot
+  \sum^{*(l-1)}_{r=0}{w^{l-1}_{rq} \frac {\partial a^{l-1}_r} {\partial
+  w^k_{ij}}}$
 
-Con esto ya es suficiente para tener una fórmula recursiva bien definida. En la implementación además se define el caso $k = l - 2$, es decir cuando el peso es casi inmediato a la neurona, con el fin de reducir la computación extra generada por la recursividad.
+Con esto ya es suficiente para tener una fórmula recursiva bien definida. En la
+implementación además se define el caso $k = l - 2$, es decir cuando el peso es
+casi inmediato a la neurona, con el fin de reducir la computación extra generada
+por la recursividad.
 
 En conclusión, según los valores de $l$, $q$, $k$, $i$ y $j$, tenemos que:
 
-\[
+$$
 \frac {\partial a^l_q} {\partial w^k_{ij}} = g'(h^l_q) \cdot \left\{
     \begin{array}{ll}
         0\\
@@ -147,7 +165,7 @@ En conclusión, según los valores de $l$, $q$, $k$, $i$ y $j$, tenemos que:
             \frac {\partial a^{l-1}_r} {\partial w^k_{ij}}}
     \end{array}
 \right.
-\]
+$$
 
 ## Implementación
 
@@ -156,20 +174,29 @@ como la red en general surgen distintas particularidades que se detallan a
 continuación.
 
 La derivación anterior de $\frac {\partial a^l_q} {\partial w^k_{ij}}$ puede
-verse reflejada en la implementación en los métodos con nombre conteniendo la palabra `dadw`, en particular la definición más directa se encuentra en `NeuralNetwork.py_dadw(l, q, k, i, j)`.
+verse reflejada en la implementación en los métodos con nombre conteniendo la
+palabra `dadw`, en particular la definición más directa se encuentra en
+`NeuralNetwork.py_dadw(l, q, k, i, j)`.
 <!-- TODO: Link al github -->
 
-Con este método es ahora posible calcular los gradientes y actualizar los pesos, y si bien es aún muy ineficiente es bueno realizar *chequeos numéricos* para corroborar que el cálculo del gradiente es correcto.
+Con este método es ahora posible calcular los gradientes y actualizar los pesos,
+y si bien es aún muy ineficiente es bueno realizar *chequeos numéricos* para
+corroborar que el cálculo del gradiente es correcto.
 
 <!-- TODO: Link tests -->
 
-Se replantea el problema en función de *matrices* para aprovecharse de las mejoras de rendimiento proporcionadas por `NumPy`, ver métodos con prefijo `np_`.
-La explicación sobre las distintas transformaciones que le suceden al problema escapan al alcance de este trabajo y pueden verse en detalle en las notas manuscritas, en la sección de *"matricization"*.
+Se replantea el problema en función de *matrices* para aprovecharse de las
+mejoras de rendimiento proporcionadas por `NumPy`, ver métodos con prefijo
+`np_`. La explicación sobre las distintas transformaciones que le suceden al
+problema escapan al alcance de este trabajo y pueden verse en detalle en las
+notas manuscritas, en la sección de *"matricization"*.
 
-<!-- TODO: Referenciar handwritten notes on matricization -->
-<!-- TODO: Linkear a los métodos np_DADW, np_get_gradients, etc -->
-<!-- TODO: Hablar más de las matrices DADW? y las otras matrices? -->
-<!-- TODO: una vez que haga los TODO de arriba, revisar y reescribir el párrafo -->
+<!--
+TODO: Referenciar handwritten notes on matricization
+TODO: Linkear a los métodos np_DADW, np_get_gradients, etc
+TODO: Hablar más de las matrices DADW? y las otras matrices?
+TODO: una vez que haga los TODO de arriba, revisar y reescribir el párrafo
+-->
 
 Además, como esperamos utilizar minibatches, prepararemos a la red para *correr
 de a batches*. En lugar de tomar una única entrada y devolver una única capa de
@@ -193,14 +220,14 @@ más que una transformación aritmética.
 Luego de estas mejoras, la implementación gana un rendimiento sustancial que,
 pese a no estar completamente optimizado, es suficiente como para entrenar en
 tiempos razonables las arquitecturas deseadas. El tiempo de entrenamiento por
-época del clasificador de dígitos MNIST con arquitectura `28² ⨯ 16 ⨯ 16 ⨯ 10`
+época del clasificador de dígitos MNIST con arquitectura `28² x 16 x 16 x 10`
 puede verse reflejado en la siguiente tabla comparándose las versiones que
 calculan los gradientes en Python puro `py`, con NumPy `np`, con Cython `cy` y
 la comparación con el estado del arte que se asume está implementado en PyTorch
 `tr` (recordar que este implementa backpropagation y no el algoritmo más ingenuo
 de frontpropagation presentado en este trabajo).
 
-| *Version* | i7 7700HQ x1 | E5 2680 x1 | i7 7700HQ x4 | E5 2680 x24 |
+| *Versión* | i7 7700HQ x1 | E5 2680 x1 | i7 7700HQ x4 | E5 2680 x24 |
 |---|---|---|---|---|
 | `py` | 405  | 467  | — | — |
 | `np` | 6.31 | 7.14 | — | — |
@@ -210,6 +237,12 @@ de frontpropagation presentado en este trabajo).
 *<center>Tabla 1: Tiempos de entrenamiento por época en segundos</center>*
 
 <!-- TODO: Checkear si ese tag center anda en el pdf de pandoc -->
+
+## Desempeño de la Red
+
+Se utiliza la implementación para modelar dos redes sobre el conjunto de dígitos manuscritos [MNIST](http://yann.lecun.com/exdb/mnist/). Un clasificador con arquitectura `28² x 16 x 16 x 10` que reconoce el dígito escrito y un autoencoder `28² x 64 x 28²` que imita la función identidad de la entrada. Se implementan también las mismas redes en PyTorch. Estos son los resultados luego de 16 épocas.
+
+<!-- TODO: Hacer gráficos -->
 
 ### Otras Ideas
 
