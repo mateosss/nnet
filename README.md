@@ -8,3 +8,4 @@ python main.py
 <!-- TODO: Add note on parallelism and cython "does the job" -->
 <!-- TODO: Add note on how to run tests -->
 <!-- TODO: Mention reason for weird backprop -->
+<!-- The idea of this project is to have a from the ground up implementation to write plug and play algorithms to test out ideas. -->
