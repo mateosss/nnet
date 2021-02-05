@@ -22,6 +22,7 @@ cumsum = _np.cumsum
 sqrt = partial(_np.sqrt, dtype=DTYPE)
 exp = partial(_np.exp, dtype=DTYPE)
 randn = lambda *a, **kw: _np.random.standard_normal(*a, **kw).astype(DTYPE)
+rand = lambda *a, **kw: _np.random.rand(*a, **kw).astype(DTYPE)
 
 # TODO: Try more activation functions as ReLU and others
 # TODO: Move activation function inside class
@@ -73,13 +74,8 @@ class NeuralNetwork:
         self._DADW_cache = {}
         self._velocities = [zeros_like(wm) for wm in self.weights]
 
-    # TODO: Understand and try other initializations as xavier and kaiming
-    # see https://towardsdatascience.com/weight-initialization-in-neural-networks-a-journey-from-the-basics-to-kaiming-954fb9b47c79
-    def get_random_params(self):
-        # CUSTOM initialization heuristic
-        # i / n to scale the sum result based on number of input weights
-        # seems to make outputs stable
-        # TODO: Should biases be initialized differently?
+    def get_random_params_custom(self):
+        "Custom initialization heuristic, works better than kaiming for MNIST autoencoder."
         return array(
             [
                 i / sqrt(n + 1)
@@ -87,6 +83,18 @@ class NeuralNetwork:
                 for i in randn((n + 1) * m)
             ]
         )
+
+    def get_random_params_kaiming_uniform(self):
+        return array(
+            [
+                (i - 0.5) * sqrt(3 / (n + 1))
+                for n, m in zip(self.dlayers, self.dlayers[1:])
+                for i in rand((n + 1) * m)
+            ]
+        )
+
+    def get_random_params(self):
+        return self.get_random_params_kaiming_uniform()
 
     @property
     def params(self):
