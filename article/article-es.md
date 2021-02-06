@@ -30,17 +30,15 @@ Redes Neuronales 2020 - FaMAF, UNC - Febrero 2021
 
 Se explora el proceso de derivación e implementación de una red neuronal
 feedforward multicapa y se analizan sus complicaciones para lograr un mejor
-entendimiento de los modelos actuales. Se deriva e implementa una fórmula para
-el cálculo de los gradientes de forma ingenua y se la contrasta con el estándar
+entendimiento de los modelos actuales. Se deriva e implementa un algoritmo para
+el cálculo de los gradientes de forma ingenua y se lo contrasta con el estándar
 de backpropagation ofrecido por PyTorch. La implementación se realiza
 inicialmente en Python con la ayuda de la librería NumPy y tanto por el método
 ineficiente de actualización de gradientes como por el costo adicional del
 lenguaje interpretado surgen varios desafíos de performance que son abordados
 mediante el uso de Cython y paralelismo en CPU. El resultado final, lejos de ser
 óptimo, es adecuado para el entrenamiento de un clasificador y un autoencoder
-sobre los datos de MNIST en tiempos razonables.
-
-<!-- TODO: Linkear mnist -->
+sobre los datos de [MNIST] en tiempos razonables.
 
 ## Derivación
 
@@ -48,9 +46,18 @@ sobre los datos de MNIST en tiempos razonables.
 
 <!-- TODO: Referenciar nnet.svgz como una derivación handwritten más detallada -->
 
-Gran parte del funcionamiento de las redes feedforward es relativamente intuitivo, el mayor desafío está en la correcta derivación e implementación del paso de actualización de pesos.
+Gran parte del funcionamiento de las redes feedforward es relativamente intuitivo, el
+mayor desafío está en la correcta derivación e implementación del paso de actualización
+de pesos. La forma usual de esta actualización es mediante el descenso por el gradiente,
+en particular mediante el algoritmo de backpropagation. Es bueno tener en cuenta que hay
+muchas formas de minimizar una función como la de costo, por esto se implementó antes
+una versión que actualiza los pesos mediante algoritmos genéticos que, si bien es subóptima
+no logrando superar el 25% de precisión en el clasificador MNIST, muestra que
+incluso algoritmos tan sencillos logran hacer que la red aprenda ciertos patrones. La
+red desarrollada en este trabajo utilizará descenso por el gradiente pero con un
+algoritmo distinto a backpropagation que se deriva a continuación.
 
-Inicialmente utilizaremos como función de costo el error cuadrático medio (MSE) de la capa de salida contra el objetivo esperado:
+Utilizaremos como función de costo el error cuadrático medio (MSE) de la capa de salida contra el objetivo esperado:
 
 $$
 E(\vec s, \vec t) = \frac 1 {\#L} \sum^{*L}_{q=0}{(O_q - t_q)^2}
@@ -62,7 +69,7 @@ Con
 - $\vec t$: objetivo
 - $L$: índice de última capa
 - $*L$: índice de la última neurona de la capa $L$
-- $\# L$: tamaño de la capa $L$ (incluyendo neurona con salida constante para el bias)
+- $\# L$: tamaño de la capa $L$
 
 Expresamos el gradiente de la función de error con respecto a un peso específico.
 
@@ -77,7 +84,7 @@ Con
 
 - $w^k_{ij}$: peso de neurona $i$ de capa $k$ a neurona $j$ de capa $k+1$
 - $O_q$: salida $q$ de la red
-- $a^L_q$: salida de la neurona $q$ de la capa $L$. Al ser la última capa es equivalente a $O_q$.
+- $a^L_q$: salida de la neurona $q$ de la capa $L$. Al ser la última capa es $O_q$.
 
 ---
 
@@ -119,14 +126,19 @@ Estamos ahora en posición de analizar por casos el valor de $\frac {\partial
 a^l_q} {\partial w^k_{ij}}$.
 
 - Si $l = 0$ (capa de entrada) $\Rightarrow \frac {\partial a^0_q} {\partial
-  w^k_{ij}}$ ya que $a^0_q \equiv 0$
+  w^k_{ij}} = 0$
+
+  ya que $a^0_q \equiv 0$
 
 - Sino, si $q = \#l$ (neurona de bias) $\Rightarrow \frac {\partial a^l_q}
-  {\partial w^k_{ij}} = 0$ ya que la neurona bias es constantemente 1.
+  {\partial w^k_{ij}} = 0$
+
+  ya que la neurona bias es constantemente 1.
 
 - Sino, si $k \ge l$ (peso posterior a neurona) $\Rightarrow \frac {\partial
-  a^l_q} {\partial w^k_{ij}} = 0$ ya que un peso posterior no influye en el
-  valor de activación.
+  a^l_q} {\partial w^k_{ij}} = 0$
+
+  ya que un peso posterior no influye en el valor de activación.
 
 - Sino, si $k = l - 1$ (peso inmediato a la neurona) $\Rightarrow \frac
   {\partial a^l_q} {\partial w^k_{ij}} = g'(h^l_q) \frac {\partial h^l_q}
@@ -144,7 +156,9 @@ a^l_q} {\partial w^k_{ij}}$.
     - Si $j \ne q \Rightarrow \frac {\partial a^l_q} {\partial w^k_{ij}} =
       g'(h^l_q) \cdot 0 = 0$
 
-- Sino, si $k < l - 1$ (peso no inmediato a la neurona) $\Rightarrow \frac
+- Sino, si $k < l - 1$ (peso no inmediato a la neurona)
+
+  $\Rightarrow \frac
   {\partial a^l_q} {\partial w^k_{ij}} = g'(h^l_q) \cdot
   \sum^{*(l-1)}_{r=0}{w^{l-1}_{rq} \frac {\partial a^{l-1}_r} {\partial
   w^k_{ij}}}$
@@ -157,6 +171,7 @@ por la recursividad.
 En conclusión, según los valores de $l$, $q$, $k$, $i$ y $j$, tenemos que:
 
 $$
+\tag{2}
 \frac {\partial a^l_q} {\partial w^k_{ij}} = g'(h^l_q) \cdot \left\{
     \begin{array}{ll}
         0\\
@@ -170,7 +185,7 @@ $$
 ## Implementación
 
 Al implementar tanto la fórmula anterior en este algoritmo de frontpropagation
-como la red en general surgen distintas particularidades que se detallan a
+como el resto de los aspectos de la red surgen distintas particularidades que se detallan a
 continuación.
 
 La derivación anterior de $\frac {\partial a^l_q} {\partial w^k_{ij}}$ puede
@@ -184,6 +199,7 @@ y si bien es aún muy ineficiente es bueno realizar *chequeos numéricos* para
 corroborar que el cálculo del gradiente es correcto.
 
 <!-- TODO: Link tests -->
+<!-- TODO: Link stanford cs231n -->
 
 Se replantea el problema en función de *matrices* para aprovecharse de las
 mejoras de rendimiento proporcionadas por `NumPy`, ver métodos con prefijo
@@ -205,17 +221,17 @@ cantidad de entradas y salidas que el tamaño del minibatch.
 
 <!-- TODO: Linkear a algo que muestre lo de los batches -->
 
-Para lograr mejoras en los tiempos de ejecución se utilizan técnicas de
-*programación dinámica* para que la recursividad de la definición y *Cython*, un
-superconjunto de Python que transpila a C, para reescribir y paralelizar con
-OpenMP porciones del código que lo ameritan para mayor rendimiento. En el
-proceso se utilizan diversos profilers como `line_profile`, `cProfile` y `perf`
-para entender mejor los hotspots del código. Por cada cuello de botella
-detectado con un profiler se lo reescribe utilizando de forma extensiva el
-conocimiento de las ecuaciones y transformaciones de aritmética matricial que
-puedan ser de beneficio computacional. Y si bien la versión más performante
-pierda legibilidad en contraste con la original, es escencial entender que no es
-más que una transformación aritmética.
+Para lograr mejoras en los tiempos de ejecución se utilizan técnicas de *programación
+dinámica* para aliviar el trabajo extra que significa la recursividad en la
+actualización de pesos. También se utiliza *Cython*, un superconjunto de Python que
+transpila a C, para reescribir y paralelizar con OpenMP porciones del código que lo
+ameritan para mayor rendimiento. En el proceso se utilizan diversos profilers como
+`line_profile`, `cProfile` y `perf` para entender mejor los hotspots del código. Por
+cada cuello de botella detectado con un profiler se lo reescribe utilizando de forma
+extensiva el conocimiento de las ecuaciones y transformaciones de aritmética matricial
+que puedan ser de beneficio computacional. Si bien la versión más performante pierde
+legibilidad en contraste con la original, es escencial entender que no es más que una
+transformación aritmética.
 
 Luego de estas mejoras, la implementación gana un rendimiento sustancial que,
 pese a no estar completamente optimizado, es suficiente como para entrenar en
@@ -234,17 +250,32 @@ de frontpropagation presentado en este trabajo).
 | `cy` | 3.97 | 4.23 | 1.71 | 0.63 |
 | `tr` | 0.08 | 0.10 | — | — |
 
-*<center>Tabla 1: Tiempos de entrenamiento por época en segundos</center>*
+<!-- *<center>Tabla 1: Tiempos de entrenamiento por época en segundos</center>* -->
+\begin{center}
+\emph{Tabla: tiempos de entrenamiento de una época en segundos sobre distintas CPUs}
+\end{center}
 
 <!-- TODO: Checkear si ese tag center anda en el pdf de pandoc -->
 
 ## Desempeño de la Red
 
-Se utiliza la implementación para modelar dos redes sobre el conjunto de dígitos manuscritos [MNIST](http://yann.lecun.com/exdb/mnist/). Un clasificador con arquitectura `28² x 16 x 16 x 10` que reconoce el dígito escrito y un autoencoder `28² x 64 x 28²` que imita la función identidad de la entrada. Se implementan también las mismas redes en PyTorch. Estos son los resultados luego de 16 épocas.
+Se utiliza la implementación para modelar dos redes sobre el conjunto de dígitos
+manuscritos [MNIST]. Un clasificador con arquitectura `28² x 16 x 16 x 10` que
+reconoce el dígito escrito y un autoencoder `28² x 64 x 28²` que imita la
+función identidad de la entrada. Se implementan también las mismas redes en
+PyTorch. Los siguientes resultados son sobre el conjunto de validación, los resultados sobre el conjunto de entrenamiento son virtualmente identicos.
 
 ![Clasificador MNIST - Error y Precisión](res/class_losses_hitrate_es.svg)
 
-### Otras Ideas
+Cabe aclarar que si bien tanto la implementación de este trabajo `Nnet` como la
+versión en `PyTorch` utilizan la [misma][kaiming-pytorch-docs] inicialización de
+pesos basada en [Kaiming][kaiming-paper] sobre una distribución uniforme, los
+bias en la versión `PyTorch` son inicializados de forma levemente distinta. A
+esto y al azar inherente a la corrida se le atribuyen las pequeñas diferencias
+de performance de las redes. Para mostrar este punto se grafica además una versión
+`Nnet*` que utiliza una forma de inicialización más ingenua (i.e. $\frac
+{\mathcal{N}(0, 1)} {\sqrt{fanin}}$) que en estas arquitecturas parece mejorar
+el rendimiento.
 
 <!-- ![Clasificador MNIST - Error y Precisión](res/auto_losses_es.svg) -->
 
@@ -252,29 +283,30 @@ Se utiliza la implementación para modelar dos redes sobre el conjunto de dígit
   \includegraphics[width=200px]{res/auto_losses_es.pdf}
 \end{center}
 
-Ahora que tenemos nuestra implementación funcionando
+Notar la similitud de las versiones `Nnet` y `PyTorch`. Esto muestra que nuestro
+algoritmo de frontpropagation parece estar dando los mismos resultados que el
+backpropagation clásico. Efectivamente si se inicializan las dos redes con los
+mismos pesos los resultados no presentan diferencia significativa, incluso con las
+aleatoriedades propias del descenso estocástico.
 
-<!-- TODO:
+## Conclusiones
 
-red con
-1. inizializacion random
-2. activaciones sigmoide
-3. minibatches no random
-4. gd sin momentum
-5. mse loss function
+Se ha implementado una red neuronal desde los conceptos básicos derivando e
+implementando en el proceso un algoritmo de actualización de pesos que es correcto. Se
+ha mostrado que a pesar de ser poco eficiente, logra entrenar redes de tamaños significativos en tiempos aceptables. El conocimiento obtenido en el proceso es de gran valor y permite obtener una mayor solvencia en la implementación de nuevas técnicas sobre las redes.
 
-luego como mejora cuando le cambias 1, 2, 3, 4 y 5 respectivamente
+A futuro es posible implementar otras características como regularizaciones, dropout,
+actualización ADAM, función de error cross entropy las cuales será posible poner a punto
+para la aplicación deseada modificando no solo los parámetros pero, de ser necesario,
+los algoritmos en sí. Esto trae mucha libertad de exploración para plantear nuevas
+técnicas. Otra tecnología que no se alcanzó a profundizar, es el uso de
+autodiferenciación. Notar que cambios en la función de error necesitarían volver a
+derivar e implementar los gradientes, librerías como PyTorch o TensorFlow utilizan en
+cambio autodiferenciación sobrecargando operadores para, regla de la cadena mediante,
+calcular los gradientes de forma automática para cualquier combinación de operaciones.
 
-five stages:
-    1. weight initialization
-        random vs autoencoder, mio, xavier, kaiming
-    2. activation functions
-        sigmoid vs relu/clamp
-    3. randomness in gradient descent (minibatch, dropout)
-        batched vs uno por uno vs minibatch vs shuffle
-        no dropout vs dropout
-    4. improve weight update: momentum, nesterov, lr adaptativo, rprop, rmsprop, adam
-        no momentum vs momentum
-    5. better loss function: regularization L1 L2, cross entropy -->
+<!-- Referencias -->
 
-<!-- TODO: Performance autoencoder, clasificador, y mencionar que anda igual a pytorch -->
+[MNIST]: http://yann.lecun.com/exdb/mnist/
+[kaiming-pytorch-docs]: https://pytorch.org/docs/stable/nn.init.html#torch.nn.init.kaiming_uniform_
+[kaiming-paper]: https://arxiv.org/abs/1502.01852v1
