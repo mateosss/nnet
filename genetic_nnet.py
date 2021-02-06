@@ -77,7 +77,7 @@ class GANeuralNetwork(Subject, NeuralNetwork):
 
     @classmethod
     def get_random_params(cls):
-        return super().get_random_params(cls)
+        return super().get_random_params_custom(cls)
 
 
 class NeuralGA(GeneticAlgorithm):
