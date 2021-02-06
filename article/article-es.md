@@ -243,6 +243,7 @@ de frontpropagation presentado en este trabajo).
 Se utiliza la implementación para modelar dos redes sobre el conjunto de dígitos manuscritos [MNIST](http://yann.lecun.com/exdb/mnist/). Un clasificador con arquitectura `28² x 16 x 16 x 10` que reconoce el dígito escrito y un autoencoder `28² x 64 x 28²` que imita la función identidad de la entrada. Se implementan también las mismas redes en PyTorch. Estos son los resultados luego de 16 épocas.
 
 <!-- TODO: Hacer gráficos -->
+<!-- TODO: Aclarar en los gráficos que están solo las versiones del set de test por que el de entrenamiento era en todos los casos virtualmente identico -->
 
 ### Otras Ideas
 
