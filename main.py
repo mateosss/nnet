@@ -8,22 +8,21 @@ from nets.ganet import NeuralGA
 from nets.nnet import NeuralNetwork
 from nets.cynet import CyNet
 
-# TODO: Improve program print output
-# TODO: Add argparse options to configure the run
+AUTOENCODER = False # train autoencoder or classifier
 
 SAVE_FILE = "params.npy"
-DLAYERS = [784, 16, 16, 10]
+DLAYERS = [784, 16, 16, 10] if not AUTOENCODER else [784, 64, 784]
 EPOCHS = 16
 BATCH_SIZE = 1000 # TESTMARK
 
-np.random.seed(1)
-
-# Assertion needed for using dataset()
+# TODO: Network does not work for batches that are not exactly BATCH_SIZE size
 assert 60000 % BATCH_SIZE == 0 and 10000 % BATCH_SIZE == 0
 
 LOG_SAMPLE_FREQ = 1000  # How many samples between logs
 assert LOG_SAMPLE_FREQ % BATCH_SIZE == 0, "should be multiples"
 LOG_FREQ = LOG_SAMPLE_FREQ / BATCH_SIZE  # How many batches between logs
+
+np.random.seed(1)
 
 # TODO: Save runs to a separate folder and don't overwrite them
 def save_params(params):
@@ -96,8 +95,8 @@ def train(net: NeuralNetwork, trainbatches_gen, testbatches_gen):
 
 def main():
     net = CyNet(DLAYERS, BATCH_SIZE)
-    trainbatches_gen = mnist.load("training", BATCH_SIZE)
-    testbatches_gen = mnist.load("testing", BATCH_SIZE)
+    trainbatches_gen = mnist.load("training", BATCH_SIZE, autoencoder=AUTOENCODER)
+    testbatches_gen = mnist.load("testing", BATCH_SIZE, autoencoder=AUTOENCODER)
     train(net, trainbatches_gen, testbatches_gen)
 
 
