@@ -5,19 +5,25 @@ from dataclasses import dataclass
 import numpy as np
 from numpy.linalg import norm
 
-import mnist
-from nnet import NeuralNetwork
+from mnist import mnist
+from nets.nnet import NeuralNetwork
+from nets.pynet import PyNet
+from nets.npnet import NpNet
+from nets.cynet import CyNet
 
 np.random.seed(1)  # TODO: Remove?
 WTOL = 10  # weights must be within [-WTOL, +WTOL]
 COMPLETENESS = 0.05  # ratio of loops that will be effectively tested
-BATCH_SIZE = 1000
-DTYPE = np.dtype("float32")
+BATCH_SIZE = 1000 # TESTMARK
+DTYPE = np.dtype("float32") # TESTMARK
 
 # TODO: Needed for now, but it should be a cleaner way to set BATCH_SIZE and DTYPE globally
 assert BATCH_SIZE == 1 and DTYPE == np.dtype(
     "float64"
-), "Modify all .py[x] files to use BATCH_SIZE = 1 and float64 when testing"
+), (
+    "Modify all .py[x] files to use BATCH_SIZE = 1 and float64 when testing"
+    "Search globally for TESTMARK to find where to apply the changes."
+)
 
 EPOCHS = mnist.load(batch_size=BATCH_SIZE)  # Epoch batches generator
 BATCHES = next(EPOCHS)  # Epoch mini batches
@@ -96,7 +102,7 @@ def test_dadw(completeness=COMPLETENESS):
     """
     dlayers = [784, 16, 16, 10]
     L = len(dlayers) - 1  # Last layer index
-    net = NeuralNetwork(dlayers, batch_size=BATCH_SIZE)
+    net = PyNet(dlayers, batch_size=BATCH_SIZE)
 
     # maximum relative difference between numerical and analytical dadw
     maxreldiff = 0
@@ -117,7 +123,7 @@ def test_dadw(completeness=COMPLETENESS):
             ndadw = (b_out - a_out) / (2 * epsilon)
             wmatrix[i, j] = w
             net.feedforward(INPUT)  # Refreshes net fanin and activation
-            adadw = np.array([net.py_dadw(L, q, k, i, j) for q in range(dlayers[-1])])
+            adadw = np.array([net.dadw(L, q, k, i, j) for q in range(dlayers[-1])])
             adadw = adadw[np.newaxis, :]
 
             normalizer = max(norm(adadw), norm(ndadw))
@@ -128,8 +134,8 @@ def test_dadw(completeness=COMPLETENESS):
                 maxreldiff = reldiff
                 if maxreldiff > 1e-7:
                     outliers += 1
-                assert outliers < 10, f"too many bad apples: {outliers}"
-                assert maxreldiff <= 3e-7, f"{maxreldiff=} is too high"
+            assert outliers < 10, f"too many bad apples: {outliers}"
+            assert maxreldiff <= 1e-6, f"{maxreldiff=} is too high"
     print(
         f"[dadw] maxreldiff={maxreldiff} between numeric and analytical dadw with {outliers} outliers >1e7"
     )
@@ -142,13 +148,25 @@ def test_get_gradients():
     Make one big update with the error gradient and assert it is almost perfect.
     """
     dlayers = [784, 16, 16, 10]
-    nnet = NeuralNetwork(dlayers, batch_size=BATCH_SIZE)
+    pynet = PyNet(dlayers, batch_size=BATCH_SIZE)
+    npnet = NpNet(dlayers, batch_size=BATCH_SIZE, params=pynet.params)
+    cynet = CyNet(dlayers, batch_size=BATCH_SIZE, params=pynet.params)
 
-    nnet.feedforward(INPUT)
-    old_error = nnet.get_error(TARGET)[0]
-    py_grads = nnet.py_get_gradients(TARGET)
-    np_grads = nnet.np_get_gradients(TARGET)
-    cy_grads = nnet.cy_get_gradients(TARGET)
+    py_old_out = pynet.feedforward(INPUT)[0]
+    np_old_out = npnet.feedforward(INPUT)[0]
+    cy_old_out = cynet.feedforward(INPUT)[0]
+
+    assert (py_old_out == np_old_out).all() and (np_old_out == cy_old_out).all()
+
+    py_old_error = pynet.get_error(TARGET)[0]
+    np_old_error = npnet.get_error(TARGET)[0]
+    cy_old_error = cynet.get_error(TARGET)[0]
+
+    assert py_old_error == np_old_error == cy_old_error
+
+    py_grads = pynet.get_gradients(TARGET)
+    np_grads = npnet.get_gradients(TARGET)
+    cy_grads = cynet.get_gradients(TARGET)
 
     maxdiff = 0
     for k in range(len(dlayers) - 1):
@@ -172,30 +190,17 @@ def test_get_gradients():
         for py_gm, cy_gm in zip(py_grads, cy_grads)
     )
 
-    for wm, gm in zip(nnet.weights, py_grads):
+    for wm, gm in zip(pynet.weights, py_grads):
         wm[...] -= gm[0] * 1000
 
-    new_out = nnet.feedforward(INPUT)[0]
-    new_error = nnet.get_error(TARGET)[0]
+    new_out = pynet.feedforward(INPUT)[0]
+    new_error = pynet.get_error(TARGET)[0]
 
     print(
         "[get_gradients] [step] "
-        f"{old_error=:.6f}, "
+        f"{py_old_error=:.6f}, "
         f"{new_error=:.6f}, "
         f"maxdiff between grads is {maxdiff}"
     )
     assert np.isclose(new_error, 0)
     assert np.allclose(new_out, TARGET[0])
-
-
-def test_mnist_shuffle():
-    a = np.arange(1000)
-    b = np.arange(1000)
-    mnist.shuffle(a, b)
-    assert all(a == b)
-
-    A = np.arange(100 * 10).reshape(100, 10)
-    AA = A.copy()
-    idx = np.arange(100)
-    mnist.shuffle(AA, idx)
-    assert (AA == A[idx]).all()

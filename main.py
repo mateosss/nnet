@@ -14,7 +14,7 @@ from nets.cynet import CyNet
 SAVE_FILE = "params.npy"
 DLAYERS = [784, 16, 16, 10]
 EPOCHS = 16
-BATCH_SIZE = 1000
+BATCH_SIZE = 1000 # TESTMARK
 
 np.random.seed(1)
 

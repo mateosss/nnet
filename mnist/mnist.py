@@ -4,7 +4,7 @@ import struct
 import matplotlib.pyplot as plt
 import numpy as np
 
-DTYPE = np.dtype("float32")
+DTYPE = np.dtype("float32") # TESTMARK
 MNIST_PATH = "./mnist/mnist_training_data"
 
 
