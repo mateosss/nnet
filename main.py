@@ -3,9 +3,10 @@
 from time import time
 import numpy as np
 
-import mnist
-from genetic_nnet import NeuralGA
-from nnet import NeuralNetwork
+from mnist import mnist
+from nets.ganet import NeuralGA
+from nets.nnet import NeuralNetwork
+from nets.cynet import CyNet
 
 # TODO: Improve program print output
 # TODO: Add argparse options to configure the run
@@ -13,7 +14,9 @@ from nnet import NeuralNetwork
 SAVE_FILE = "params.npy"
 DLAYERS = [784, 16, 16, 10]
 EPOCHS = 16
-BATCH_SIZE = 1000
+BATCH_SIZE = 1000 # TESTMARK
+
+np.random.seed(1)
 
 # Assertion needed for using dataset()
 assert 60000 % BATCH_SIZE == 0 and 10000 % BATCH_SIZE == 0
@@ -92,7 +95,7 @@ def train(net: NeuralNetwork, trainbatches_gen, testbatches_gen):
 
 
 def main():
-    net = NeuralNetwork(DLAYERS, BATCH_SIZE)
+    net = CyNet(DLAYERS, BATCH_SIZE)
     trainbatches_gen = mnist.load("training", BATCH_SIZE)
     testbatches_gen = mnist.load("testing", BATCH_SIZE)
     train(net, trainbatches_gen, testbatches_gen)

@@ -11,14 +11,15 @@ cimport cython
 from libc.math cimport exp
 from libc.string cimport memset
 
-cdef size_t BATCH_SIZE = 1000 # TODO: Redundant, already in main.py
+# TODO: Redundant, already in main.py
+cdef size_t BATCH_SIZE = 1000 # TESTMARK
 
 assert os.getenv("OMP_NUM_THREADS"), "Unset OMP_NUM_THREADS envvar"
 cdef size_t OMP_NUM_THREADS = int(os.getenv("OMP_NUM_THREADS"))
 
 # NOTE: Change to double and float64 these two lines for float64 usage
-ctypedef float real
-DTYPE = np.dtype("float32")
+ctypedef float real # TESTMARK
+DTYPE = np.dtype("float32") # TESTMARK
 
 cdef size_t DTYPE_SIZE = DTYPE.itemsize
 AXIS = np.newaxis

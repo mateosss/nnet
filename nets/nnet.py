@@ -5,13 +5,11 @@ from typing import Dict, List, Union
 # because it may be getting undesired float64 unintentionally
 import numpy as _np
 
-import dadw
-
-_np.random.seed(1)
+from . import cynet_native
 
 # TODO: The DTYPE should be a parameter of NeuralNetwork
 # Use same DTYPE for everything
-DTYPE = _np.dtype("float32")
+DTYPE = _np.dtype("float32") # TESTMARK
 Array = Union[_np.ndarray]
 AXIS = _np.newaxis
 array = partial(_np.array, dtype=DTYPE)
@@ -96,10 +94,6 @@ class NeuralNetwork:
         """Return parameter list that can be used to recreate this network."""
         return array([w for m in self.weights for r in m for w in r])
 
-    @property
-    def is_batched(self) -> bool:
-        return self.batch_size != 0
-
     def weights_from_params(self, params) -> List[Array]:
         """Map the flat params iterable to a proper weight matrix.
 
@@ -122,6 +116,7 @@ class NeuralNetwork:
         ilayer: Normalized input layer scaled in range [0, 1]
         returns: last layer activations (the guess)
         """
+        # TODO: invalidate cache in a better place, these one is a bit hidden
         self._dadw_cache = {}  # Previous cache invalid for this feedforward
         self._DADW_cache = {}
 
@@ -129,7 +124,8 @@ class NeuralNetwork:
         for k in range(1, len(self.dlayers)):
             # TODO: Numpy matmul @ should be used here, however see cython matmul docstring
             # self.fanin[k] = self.activations[k - 1] @ self.weights[k - 1]
-            dadw.matmul(self.activations[k - 1], self.weights[k - 1], self.fanins[k])
+            # TODO: Use cython feedforward only in CyNet, make feedforward for NpNet and PyNet
+            cynet_native.matmul(self.activations[k - 1], self.weights[k - 1], self.fanins[k])
             self.activations[k][:, :-1] = g(self.fanins[k])
         return self.activations[-1][:, :-1].copy()  # Remove bias neuron from result
 
@@ -137,114 +133,9 @@ class NeuralNetwork:
         """Return mean squared error, target tgt has an output-like structure."""
         return ((self.activations[-1][:, :-1] - tgt) ** 2).mean(axis=1)
 
-    def py_dadw(self, l, q, k, i, j, b=0):  # -> DTYPE
-        """Return derivative of a^l_q with respect to w^k_ij for batch sample b."""
-        # Memoization stuff
-        args = (l, q, k, i, j)
-        if args in self._dadw_cache:
-            return self._dadw_cache[args]
-
-        # Range assertions
-        assert 0 <= l < len(self.dlayers), f"out of range {l=}"
-        assert 0 <= k < len(self.dlayers), f"out of range {k=}"
-        assert 0 <= i < self.activations[k].size, f"out of range {i=}"
-        assert 0 <= j < self.dlayers[k], f"out of range {j=}"
-
-        # Usage assertions
-        # while dadw is theoretically defined as 0 for these, we don't want them to run
-        assert k < l, f"requesting dadw with weight right to the neuron {k=} >= {l=}"
-        assert q != self.dlayers[l], f"requesting dadw of bias neuron a^{l=}_{q=}"
-
-        # Conditional factor of the multiplication
-        if l == 0:  # No weight affects an input neuron
-            res = 0
-        elif k == l - 1 and j != q:  # Weight just before neuron but disconnected
-            res = 0
-        elif k == l - 1 and j == q:  # Weight just before neuron and connected
-            res = self.activations[k][b, i]
-        elif k == l - 2:  # Special case for performance, not needed for correctness
-            res = (
-                self.weights[l - 1][j, q]
-                * gprime(self.fanins[l - 1][b, j])
-                * self.activations[k][b, i]
-            )
-        elif k < l - 1:
-            res = sum(
-                self.weights[l - 1][r, q] * self.py_dadw(l - 1, r, k, i, j)
-                for r in range(self.dlayers[l - 1])
-            )
-        else:
-            raise Exception("Should never reach this execution branch")
-
-        # Multiply by derivative of activation function over the neuron's weighted sum
-        res *= gprime(self.fanins[l][b, q])
-
-        # Cache it
-        self._dadw_cache[args] = res
-        return res
-
-    def py_get_gradients(self, target) -> List[Array]:
-        """Matrix of each error gradient ∇E^k_{i, j} using dadw() for batch sample b."""
-        L = len(self.dlayers) - 1  # Last layer index
-        mseconst = 2 / self.dlayers[-1]
-        for k in reversed(range(L)):
-            for b in range(self.batch_size):
-                n, m = self.dlayers[k], self.dlayers[k + 1]
-                for j in range(m):
-                    for i in range(n + 1):  # +1 for bias neuron
-                        self._gradients[k][b, i, j] = mseconst * sum(
-                            (self.activations[L][b, q] - target[b, q])
-                            * self.py_dadw(L, q, k, i, j, b=b)
-                            for q in range(self.dlayers[-1])
-                        )
-        return self._gradients
-
-    def cy_DADW(self, l, q, k):
-        return dadw.DADW(self, l, q, k)
-
-    def cy_DADW_prepopulate(self):
-        return dadw.DADW_prepopulate(self)
-
-    def cy_get_gradients(self, target: Array) -> List[Array]:
-        return dadw.get_gradients(self, target)
-
-    def np_DADW(self, l, q, k):
-        """Read only matrix A^{l, q}_k of each derivative of dadw(i, j)."""
-        args = (l, q, k)
-        if args in self._DADW_cache:
-            return self._DADW_cache[args]
-
-        res = zeros_like(self._gradients[k])  # (batch_size, n + 1, m)
-        if l == k + 1:
-            derivatives = gprime(self.fanins[l][:, q, AXIS])
-            columns = self.activations[k][:]
-            res[:, :, q] = derivatives * columns
-        elif l > k + 1:
-            for r in range(self.dlayers[l - 1]):
-                res += self.weights[l - 1][r, q] * self.np_DADW(l - 1, r, k)
-            derivatives = gprime(self.fanins[l][:, q, AXIS, AXIS])
-            res[:] *= derivatives
-        else:
-            raise Exception("This execution branch should not be reached.")
-
-        res.setflags(write=False)  # As the result is cached, we make it readonly
-        self._DADW_cache[args] = res
-        return res
-
-    def np_get_gradients(self, target: Array) -> List[Array]:
+    def get_gradients(self, target: Array) -> List[Array]:
         """Matrix of each error gradient ∇E^k_{i, j} using DADW() matrices."""
-
-        L = len(self.dlayers) - 1  # Last layer index
-        mseconst = 2 / self.dlayers[L]
-        for k in reversed(range(L)):
-            summation = zeros_like(self._gradients[k])  # (batch_size, n + 1, m)
-            for q in range(self.dlayers[L]):
-                tgtdiff = self.activations[L][:, q] - target[:, q]
-                tgtdiff = tgtdiff[:, AXIS, AXIS]
-                ALqk = self.np_DADW(L, q, k)
-                summation += tgtdiff * ALqk
-            self._gradients[k] = mseconst * summation
-        return self._gradients
+        raise NotImplementedError
 
     def update_weights(self, gradients, lr=10, momentum=0.5):
         """Update weights using stochastic gradient decent with momentum.
@@ -267,7 +158,7 @@ class NeuralNetwork:
         batch_loss = errors.mean()
         results = [batch_loss]
         if grads:
-            gradients = self.cy_get_gradients(targets)
+            gradients = self.get_gradients(targets)
             batch_gradients = [gms.mean(axis=0) for gms in gradients]
             results.append(batch_gradients)
         if hitrate:
