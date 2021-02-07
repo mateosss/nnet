@@ -5,7 +5,7 @@ import numpy as np
 
 import mnist
 from genetic_nnet import NeuralGA
-from nnet import NeuralNetwork
+from nnet import NeuralNetwork, CyNet
 
 # TODO: Improve program print output
 # TODO: Add argparse options to configure the run
@@ -92,7 +92,7 @@ def train(net: NeuralNetwork, trainbatches_gen, testbatches_gen):
 
 
 def main():
-    net = NeuralNetwork(DLAYERS, BATCH_SIZE)
+    net = CyNet(DLAYERS, BATCH_SIZE)
     trainbatches_gen = mnist.load("training", BATCH_SIZE)
     testbatches_gen = mnist.load("testing", BATCH_SIZE)
     train(net, trainbatches_gen, testbatches_gen)

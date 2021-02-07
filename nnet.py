@@ -96,10 +96,6 @@ class NeuralNetwork:
         """Return parameter list that can be used to recreate this network."""
         return array([w for m in self.weights for r in m for w in r])
 
-    @property
-    def is_batched(self) -> bool:
-        return self.batch_size != 0
-
     def weights_from_params(self, params) -> List[Array]:
         """Map the flat params iterable to a proper weight matrix.
 
@@ -122,6 +118,7 @@ class NeuralNetwork:
         ilayer: Normalized input layer scaled in range [0, 1]
         returns: last layer activations (the guess)
         """
+        # TODO: invalidate cache in a better place, these one is a bit hidden
         self._dadw_cache = {}  # Previous cache invalid for this feedforward
         self._DADW_cache = {}
 
@@ -129,6 +126,7 @@ class NeuralNetwork:
         for k in range(1, len(self.dlayers)):
             # TODO: Numpy matmul @ should be used here, however see cython matmul docstring
             # self.fanin[k] = self.activations[k - 1] @ self.weights[k - 1]
+            # TODO: Use cython feedforward only in CyNet, make feedforward for NpNet and PyNet
             dadw.matmul(self.activations[k - 1], self.weights[k - 1], self.fanins[k])
             self.activations[k][:, :-1] = g(self.fanins[k])
         return self.activations[-1][:, :-1].copy()  # Remove bias neuron from result
@@ -137,7 +135,52 @@ class NeuralNetwork:
         """Return mean squared error, target tgt has an output-like structure."""
         return ((self.activations[-1][:, :-1] - tgt) ** 2).mean(axis=1)
 
-    def py_dadw(self, l, q, k, i, j, b=0):  # -> DTYPE
+    def get_gradients(self, target: Array) -> List[Array]:
+        """Matrix of each error gradient ∇E^k_{i, j} using DADW() matrices."""
+        raise NotImplementedError
+
+    def update_weights(self, gradients, lr=10, momentum=0.5):
+        """Update weights using stochastic gradient decent with momentum.
+
+        Reference: http://www.cs.toronto.edu/~hinton/absps/momentum.pdf
+        """
+        for wm, gm, vm in zip(self.weights, gradients, self._velocities):
+            vm[:, :] = -lr * gm + momentum * vm
+            wm[:, :] += vm
+
+    def batch_eval(self, batch, grads=True, hitrate=False):
+        """Return mean losses, mean gradients (if grads) and hitrate (if hitrate) of a batch.
+
+        All batches must be not larger than batch_size.
+        """
+        inputs, targets = batch
+        batch_size = len(inputs)
+        outputs = self.feedforward(inputs)
+        errors = self.get_error(targets)
+        batch_loss = errors.mean()
+        results = [batch_loss]
+        if grads:
+            gradients = self.get_gradients(targets)
+            batch_gradients = [gms.mean(axis=0) for gms in gradients]
+            results.append(batch_gradients)
+        if hitrate:
+            target_digits = targets.argmax(1)
+            output_digits = outputs.argmax(1)
+            batch_hitrate = sum(target_digits == output_digits) / batch_size
+            results.append(batch_hitrate)
+        if len(results) == 1:
+            results = results[0]
+        return results
+
+
+class PyNet(NeuralNetwork):
+    """
+    The slowest to run but the easiest to read of the networks,
+
+    implements the derived equations almost identically as they are expressed.
+    """
+
+    def dadw(self, l, q, k, i, j, b=0):  # -> DTYPE
         """Return derivative of a^l_q with respect to w^k_ij for batch sample b."""
         # Memoization stuff
         args = (l, q, k, i, j)
@@ -170,7 +213,7 @@ class NeuralNetwork:
             )
         elif k < l - 1:
             res = sum(
-                self.weights[l - 1][r, q] * self.py_dadw(l - 1, r, k, i, j)
+                self.weights[l - 1][r, q] * self.dadw(l - 1, r, k, i, j)
                 for r in range(self.dlayers[l - 1])
             )
         else:
@@ -183,7 +226,7 @@ class NeuralNetwork:
         self._dadw_cache[args] = res
         return res
 
-    def py_get_gradients(self, target) -> List[Array]:
+    def get_gradients(self, target) -> List[Array]:
         """Matrix of each error gradient ∇E^k_{i, j} using dadw() for batch sample b."""
         L = len(self.dlayers) - 1  # Last layer index
         mseconst = 2 / self.dlayers[-1]
@@ -194,22 +237,17 @@ class NeuralNetwork:
                     for i in range(n + 1):  # +1 for bias neuron
                         self._gradients[k][b, i, j] = mseconst * sum(
                             (self.activations[L][b, q] - target[b, q])
-                            * self.py_dadw(L, q, k, i, j, b=b)
+                            * self.dadw(L, q, k, i, j, b=b)
                             for q in range(self.dlayers[-1])
                         )
         return self._gradients
 
-    def cy_DADW(self, l, q, k):
-        return dadw.DADW(self, l, q, k)
 
-    def cy_DADW_prepopulate(self):
-        return dadw.DADW_prepopulate(self)
+class NpNet(NeuralNetwork):
+    """Implements the matricization of the derived equations for performance gains with numpy."""
 
-    def cy_get_gradients(self, target: Array) -> List[Array]:
-        return dadw.get_gradients(self, target)
-
-    def np_DADW(self, l, q, k):
-        """Read only matrix A^{l, q}_k of each derivative of dadw(i, j)."""
+    def DADW(self, l, q, k):
+        """Readonly matrix A^{l, q}_k of each derivative of dadw(i, j)."""
         args = (l, q, k)
         if args in self._DADW_cache:
             return self._DADW_cache[args]
@@ -221,7 +259,7 @@ class NeuralNetwork:
             res[:, :, q] = derivatives * columns
         elif l > k + 1:
             for r in range(self.dlayers[l - 1]):
-                res += self.weights[l - 1][r, q] * self.np_DADW(l - 1, r, k)
+                res += self.weights[l - 1][r, q] * self.DADW(l - 1, r, k)
             derivatives = gprime(self.fanins[l][:, q, AXIS, AXIS])
             res[:] *= derivatives
         else:
@@ -231,7 +269,7 @@ class NeuralNetwork:
         self._DADW_cache[args] = res
         return res
 
-    def np_get_gradients(self, target: Array) -> List[Array]:
+    def get_gradients(self, target: Array) -> List[Array]:
         """Matrix of each error gradient ∇E^k_{i, j} using DADW() matrices."""
 
         L = len(self.dlayers) - 1  # Last layer index
@@ -241,40 +279,16 @@ class NeuralNetwork:
             for q in range(self.dlayers[L]):
                 tgtdiff = self.activations[L][:, q] - target[:, q]
                 tgtdiff = tgtdiff[:, AXIS, AXIS]
-                ALqk = self.np_DADW(L, q, k)
+                ALqk = self.DADW(L, q, k)
                 summation += tgtdiff * ALqk
             self._gradients[k] = mseconst * summation
         return self._gradients
 
-    def update_weights(self, gradients, lr=10, momentum=0.5):
-        """Update weights using stochastic gradient decent with momentum.
 
-        Reference: http://www.cs.toronto.edu/~hinton/absps/momentum.pdf
-        """
-        for wm, gm, vm in zip(self.weights, gradients, self._velocities):
-            vm[:, :] = -lr * gm + momentum * vm
-            wm[:, :] += vm
+class CyNet(NeuralNetwork):
+    def DADW(self, l, q, k):
+        """Matrix A^{l, q}_k of each derivative of dadw(i, j)."""
+        return dadw.DADW(self, l, q, k)
 
-    def batch_eval(self, batch, grads=True, hitrate=False):
-        """Return mean losses, mean gradients (if grads) and hitrate (if hitrate) of a batch.
-
-        All batches must be not larger than batch_size.
-        """
-        inputs, targets = batch
-        batch_size = len(inputs)
-        outputs = self.feedforward(inputs)
-        errors = self.get_error(targets)
-        batch_loss = errors.mean()
-        results = [batch_loss]
-        if grads:
-            gradients = self.cy_get_gradients(targets)
-            batch_gradients = [gms.mean(axis=0) for gms in gradients]
-            results.append(batch_gradients)
-        if hitrate:
-            target_digits = targets.argmax(1)
-            output_digits = outputs.argmax(1)
-            batch_hitrate = sum(target_digits == output_digits) / batch_size
-            results.append(batch_hitrate)
-        if len(results) == 1:
-            results = results[0]
-        return results
+    def get_gradients(self, target: Array) -> List[Array]:
+        return dadw.get_gradients(self, target)
