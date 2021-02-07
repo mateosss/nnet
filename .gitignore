@@ -5,3 +5,9 @@ __pycache__/
 .mypy_cache/
 .vscode
 .venv*
+
+# Cython
+build/
+nets/cynet_native.c
+nets/cynet_native.cpython*
+nets/cynet_native.html
