@@ -16,4 +16,4 @@ disable =
     missing-function-docstring,
 
 [TYPECHECK]
-ignored-modules = dadw
+ignored-modules = cynet_native

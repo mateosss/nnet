@@ -1,6 +1,6 @@
 from typing import List
 
-from . import dadw
+from . import cynet_native
 from .nnet import NeuralNetwork, Array
 
 
@@ -15,7 +15,7 @@ class CyNet(NeuralNetwork):
 
     def DADW(self, l, q, k):
         """Matrix A^{l, q}_k of each derivative of dadw(i, j)."""
-        return dadw.DADW(self, l, q, k)
+        return cynet_native.DADW(self, l, q, k)
 
     def get_gradients(self, target: Array) -> List[Array]:
-        return dadw.get_gradients(self, target)
+        return cynet_native.get_gradients(self, target)

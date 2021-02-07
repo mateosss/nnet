@@ -5,7 +5,7 @@ from typing import Dict, List, Union
 # because it may be getting undesired float64 unintentionally
 import numpy as _np
 
-from . import dadw
+from . import cynet_native
 
 # TODO: The DTYPE should be a parameter of NeuralNetwork
 # Use same DTYPE for everything
@@ -125,7 +125,7 @@ class NeuralNetwork:
             # TODO: Numpy matmul @ should be used here, however see cython matmul docstring
             # self.fanin[k] = self.activations[k - 1] @ self.weights[k - 1]
             # TODO: Use cython feedforward only in CyNet, make feedforward for NpNet and PyNet
-            dadw.matmul(self.activations[k - 1], self.weights[k - 1], self.fanins[k])
+            cynet_native.matmul(self.activations[k - 1], self.weights[k - 1], self.fanins[k])
             self.activations[k][:, :-1] = g(self.fanins[k])
         return self.activations[-1][:, :-1].copy()  # Remove bias neuron from result
 
