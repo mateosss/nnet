@@ -78,7 +78,7 @@ intuitivo, el mayor desafío está en la correcta derivación e implementación 
 paso de actualización de pesos. La forma usual de esta actualización es mediante
 el descenso por el gradiente, en particular mediante el algoritmo de
 backpropagation. Vale aclarar que hay muchas formas de minimizar una función
-como la de costo, se implementó una versión que actualiza los pesos mediante
+como la de costo. Se implementó una versión que actualiza los pesos mediante
 algoritmos genéticos que, si bien es subóptima no logrando superar el 25% de
 precisión en el clasificador MNIST, muestra que incluso algoritmos tan sencillos
 logran hacer que la red aprenda ciertos patrones. El modelo desarrollado en este
@@ -89,7 +89,6 @@ backpropagation que se deriva a continuación.
 <!-- <center><img id="network-diagram" src="res/network-diagram.svg" width="65%"/></center>
 *<center>Figura 1: Diagrama y notación de la red. Los colores serán utiles al derivar por casos.</center>* -->
  <!-- HTML END  -->
-
 <!-- LATEX BEGIN -->
 \begin{figure}[h]
   \centering
@@ -150,7 +149,7 @@ $$
 <!-- HTML BEGIN -->
 <!-- **Notación**
 - $w^k_{ij}$: peso de neurona $i$ de capa $k$ a neurona $j$ de capa $k+1$
-- $a^L_q$: salida de la neurona $q$ de la capa $L$. Al ser la última capa es
+- $a^L_q$: salida de la neurona $q$ de la capa $L$. Al ser la última capa *es*
   $O_q$. -->
 <!-- HTML END -->
 
@@ -158,9 +157,10 @@ $$
 \begin{flushleft}
 \bigskip
 \textbf{Notación}
-$\bullet$ $w^k_{ij}$: peso de neurona $i$ de capa $k$ a neurona $j$ de capa $k+1$\\
-\hspace*{4.55em} $\bullet$ $a^L_q$: salida de la neurona $q$ de la capa $L$. Al ser la última capa es
-  $O_q$.
+$\bullet$ $w^k_{ij}$: peso de neurona $i$ de capa $k$ a neurona $j$ de capa
+$k+1$\\
+\hspace*{4.55em} $\bullet$ $a^L_q$: salida de la neurona $q$ de la capa $L$. Al
+  ser la última capa \emph{es} $O_q$.
 \bigskip
 \end{flushleft}
 
@@ -179,13 +179,13 @@ $\bullet$ $w^k_{ij}$: peso de neurona $i$ de capa $k$ a neurona $j$ de capa $k+1
 > - $h^k_j$: la entrada de la neurona $j$ de la capa $k$ que es una suma pesada
 >   (también llamada el fanin de la neurona).
 >
-> - $\delta^k_j := \frac {(O_q - t_q)^2} {\partial h^k_{j}}$: el llamado término
->   de error.
+> - $\delta^k_j := \frac {(O_q - t_q)^2} {\partial h^k_{j}}$: llamado usualmente
+>   término de error.
 >
-> Siguiendo la derivación desde este punto se llega a plantear los
-> gradientes de la capa $k$ en función de los términos de error de la
-> capa posterior $\delta^{k+1}_j$ y es de esta forma que barriendo desde la
-> salida hacia la entrada propagando los términos de error es posible calcular
+> Siguiendo la derivación con estos factores se llegan a plantear los
+> gradientes de la capa $k$ en función de los términos de error $\delta^{k+1}_j$
+> de la capa posterior y es de esta forma que barriendo desde la
+> salida hacia la entrada y propagando los términos de error es posible calcular
 > todos los gradientes, de aquí el nombre *backpropagation*. Veremos que, por el
 > contrario, la derivación presentada aquí dependerá de capas previas y por lo
 > tanto hará un barrido desde la capa de entrada a la de salida. Llamaremos
@@ -195,9 +195,9 @@ $\bullet$ $w^k_{ij}$: peso de neurona $i$ de capa $k$ a neurona $j$ de capa $k+1
 > ​ <!-- This line has a hidden whitespace character for padding -->
 
 Continuando desde $(1)$ es posible ver que se necesitará analizar $\frac
-{\partial a^l_q} {\partial w^k_{ij}}$ con $l = 0, \ldots, L$, es decir cómo
-afecta el peso $w^k_{ij}$ a la neurona $a^l_q$, para poder calcular $\frac
-{\partial a^L_q} {\partial w^k_{ij}}$.
+{\partial a^l_q} {\partial w^k_{ij}}$ para $l = 0, \ldots, L$, *(i.e. cómo
+afecta el peso $w^k_{ij}$ a cada neurona $a^l_q$)* y así poder finalmente computar
+$\frac {\partial a^L_q} {\partial w^k_{ij}}$.
 
 <!-- HTML BEGIN -->
 <!--**Notación**
@@ -217,19 +217,19 @@ Estamos ahora en posición de analizar por casos el valor de $\frac {\partial
 a^l_q} {\partial w^k_{ij}}$. Notar que cada uno de estos casos se encuentra
 ilustrado en el $\hyperref[network-diagram]{diagrama}$ anterior.
 
-1. Si $l = 0$ (capa de entrada) $\Rightarrow \frac {\partial a^0_q} {\partial
+- Si $l = 0$ (capa de entrada) $\Rightarrow \frac {\partial a^l_q} {\partial
   w^k_{ij}} = 0$
   ya que $a^0_q$ es una constante de entrada.
 
-2. Sino, si $q = \#l$ (neurona de bias) $\Rightarrow \frac {\partial a^l_q}
+- Sino, si $q = \#l$ (neurona de bias) $\Rightarrow \frac {\partial a^l_q}
   {\partial w^k_{ij}} = 0$
   ya que la neurona bias es constantemente 1.
 
-3. Sino, si $k \ge l$ (peso posterior a neurona) $\Rightarrow \frac {\partial
+- Sino, si $k \ge l$ (peso posterior a neurona) $\Rightarrow \frac {\partial
   a^l_q} {\partial w^k_{ij}} = 0$
   ya que tal peso no influye en la activación.
 
-4. Sino, si $k = l - 1$ (peso inmediato a la neurona) $\Rightarrow \frac
+- Sino, si $k = l - 1$ (peso inmediato a la neurona) $\Rightarrow \frac
   {\partial a^l_q} {\partial w^k_{ij}} = g'(h^l_q) \frac {\partial h^l_q}
   {\partial w^k_{ij}}$.
 
@@ -238,13 +238,13 @@ ilustrado en el $\hyperref[network-diagram]{diagrama}$ anterior.
     neurona $q$ y cuando no, para determinar la derivada parcial
     $\frac {\partial h^l_q} {\partial w^k_{ij}}$ lo que resulta en:
 
-    1. Si $j = q \Rightarrow \frac {\partial a^l_q} {\partial w^k_{ij}} =
+    - Si $j = q \Rightarrow \frac {\partial a^l_q} {\partial w^k_{ij}} =
       g'(h^l_q) \cdot a^k_i$
 
-    2. Si $j \ne q \Rightarrow \frac {\partial a^l_q} {\partial w^k_{ij}} =
+    - Si $j \ne q \Rightarrow \frac {\partial a^l_q} {\partial w^k_{ij}} =
       g'(h^l_q) \cdot 0 = 0$
 
-5. Sino, si $k < l - 1$ (peso no inmediato a la neurona)
+- Sino, si $k < l - 1$ (peso no inmediato a la neurona)
   $\Rightarrow \frac
   {\partial a^l_q} {\partial w^k_{ij}} = g'(h^l_q) \cdot
   \sum^{*(l-1)}_{r=0}{w^{l-1}_{rq} \frac {\partial a^{l-1}_r} {\partial
@@ -273,26 +273,22 @@ $$
 
 Al implementar tanto la fórmula anterior en este algoritmo de frontpropagation
 como el resto de los aspectos de la red surgen distintas particularidades que se
-detallan a continuación.
+detallan en esta sección.
 
 La derivación anterior de $\frac {\partial a^l_q} {\partial w^k_{ij}}$ puede
-verse reflejada en la implementación en los métodos con nombre conteniendo la
-palabra `dadw`, en particular la definición más directa se encuentra en
-`NeuralNetwork.py_dadw(l, q, k, i, j)`.
-<!-- TODO: Link al github -->
-
-Con este método es ahora posible calcular los gradientes y actualizar los pesos,
-y si bien es aún muy ineficiente es bueno realizar *chequeos numéricos* para
-corroborar que el cálculo del gradiente es correcto.
+verse reflejada en la implementación del método [`PyNet.dadw`]. Con este método
+es ahora posible calcular, aunque de forma ineficiente, los gradientes y
+actualizar los pesos con ellos. Se realizaron *chequeos numéricos* para poner a
+prueba la correctitud de la implementación del cálculo del gradiente.
 
 <!-- TODO: Link tests -->
 <!-- TODO: Link stanford cs231n -->
 
 Se replantea el problema en función de *matrices* para aprovecharse de las
-mejoras de rendimiento proporcionadas por `NumPy`, ver métodos con prefijo
-`np_`. La explicación sobre las distintas transformaciones que le suceden al
-problema escapan al alcance de este trabajo y pueden verse en detalle en las
-notas manuscritas, en la sección de *"matricization"*.
+mejoras de rendimiento proporcionadas por `NumPy` *(ver clase [`NpNet`])*. La
+explicación de las distintas transformaciones que se realizan escapan al alcance
+de este trabajo pero pueden verse en detalle en las notas manuscritas, en la
+sección de *"[matricization]"*.
 
 <!--
 TODO: Referenciar handwritten notes on matricization
@@ -312,24 +308,26 @@ Para lograr mejoras en los tiempos de ejecución se utilizan técnicas de
 *programación dinámica* para aliviar el trabajo extra que significa la
 recursividad en la actualización de pesos. También se utiliza *Cython*, un
 superconjunto de Python que transpila a C, para reescribir y paralelizar con
-OpenMP porciones del código que lo ameritan para mayor rendimiento. En el
+OpenMP porciones del código que lo ameriten para mayor rendimiento. En el
 proceso se utilizan diversos profilers como `line_profile`, `cProfile` y `perf`
-para entender mejor los hotspots del código. Por cada cuello de botella
+para entender mejor los *hotspots* del código. Por cada cuello de botella
 detectado con un profiler se lo reescribe utilizando de forma extensiva el
 conocimiento de las ecuaciones y transformaciones de aritmética matricial que
-puedan ser de beneficio computacional. Si bien la versión más performante pierde
-legibilidad en contraste con la original, es escencial entender que no es más
-que una transformación aritmética.
+puedan ser de beneficio computacional. Si bien la versión [más
+performante][cynet-getgradients] pierde legibilidad en contraste con la
+[original][pynet-getgradients], es escencial entender que no es más que una
+transformación aritmética.
 
 Luego de estas mejoras, la implementación gana un rendimiento sustancial que,
 pese a no estar completamente optimizado, es suficiente como para entrenar en
 tiempos razonables las arquitecturas deseadas. El tiempo de entrenamiento por
 época del clasificador de dígitos MNIST con arquitectura `28² x 16 x 16 x 10`
-puede verse reflejado en la siguiente tabla comparándose las versiones que
-calculan los gradientes en Python puro `py`, con NumPy `np`, con Cython `cy` y
-la comparación con el estado del arte que se asume está implementado en PyTorch
-`tr` (recordar que este implementa backpropagation y no el algoritmo más ingenuo
-de frontpropagation presentado en este trabajo).
+puede verse reflejado en la siguiente tabla comparándose la versión que calculan
+los gradientes en Python puro [`PyNet`] (`py`), la que usa NumPy [`NpNet`]
+(`np`), la paralelizada con Cython [`CyNet`] (`cy`) y la versión que usa el
+estado del arte que se asume está implementado en PyTorch `tr` (recordar que
+esta última implementa backpropagation y no el algoritmo más ingenuo e
+ineficiente de frontpropagation presentado en este trabajo).
 
 | *Versión* | i7 7700HQ x1 | E5 2680 x1 | i7 7700HQ x4 | E5 2680 x24 |
 |---|---|---|---|---|
@@ -412,3 +410,10 @@ gradientes de forma automática para cualquier combinación de operaciones.
 [MNIST]: http://yann.lecun.com/exdb/mnist/
 [kaiming-pytorch-docs]: https://pytorch.org/docs/stable/nn.init.html#torch.nn.init.kaiming_uniform_
 [kaiming-paper]: https://arxiv.org/abs/1502.01852v1
+[`PyNet.dadw`]: https://example.com <!-- TODO -->
+[`PyNet`]: https://example.com <!-- TODO -->
+[`NpNet`]: https://example.com <!-- TODO -->
+[`CyNet`]: https://example.com <!-- TODO -->
+[pynet-getgradients]: https://example.com <!-- TODO -->
+[matricization]: https://example.com <!-- TODO -->
+[cynet-getgradients]: https://example.com <!-- TODO -->
