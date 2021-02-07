@@ -1,3 +1,5 @@
+"""NeuralNetwork base class file from where all the other networks derive."""
+
 from functools import partial
 from typing import Dict, List, Union
 
