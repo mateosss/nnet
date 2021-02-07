@@ -3,8 +3,9 @@
 # subtitle: "Redes Neuronales 2020 - FaMAF, UNC - Octubre 2020"
 # author: Mateo de Mayo (mateodemayo@mi.unc.edu.com)
 # linkcolor=[rgb]{0 1 1} works as well
-date: November 29, 2020
+# date: November 29, 2020
 output: pdf_document
+geometry: "left=3cm,right=3cm,top=3cm,bottom=3cm"
 header-includes:
   - \hypersetup{
       colorlinks=true,
@@ -14,6 +15,9 @@ header-includes:
       filecolor=magenta
       urlcolor=cyan
       urlstyle{same}}
+  - \usepackage{wrapfig}
+  - \renewcommand{\figurename}{Figura}
+  - \renewcommand{\tablename}{Tabla}
 ---
 
 <!-- TODO: Estoy manteniendo bien los tiempos verbales a lo largo del texto? -->
@@ -46,18 +50,32 @@ sobre los datos de [MNIST] en tiempos razonables.
 
 <!-- TODO: Referenciar nnet.svgz como una derivación handwritten más detallada -->
 
-Gran parte del funcionamiento de las redes feedforward es relativamente intuitivo, el
-mayor desafío está en la correcta derivación e implementación del paso de actualización
-de pesos. La forma usual de esta actualización es mediante el descenso por el gradiente,
-en particular mediante el algoritmo de backpropagation. Es bueno tener en cuenta que hay
-muchas formas de minimizar una función como la de costo, por esto se implementó antes
-una versión que actualiza los pesos mediante algoritmos genéticos que, si bien es subóptima
-no logrando superar el 25% de precisión en el clasificador MNIST, muestra que
-incluso algoritmos tan sencillos logran hacer que la red aprenda ciertos patrones. La
+<!-- ![Diagrama y notación de la red](res/network-diagram.svg) -->
+
+\begin{wrapfigure}{r}{0.5\textwidth}
+  \begin{center}
+    \includegraphics[width=0.48\textwidth]{res/network-diagram.pdf}
+  \end{center}
+  \caption{Diagrama y notación de la red}
+\end{wrapfigure}
+
+Gran parte del funcionamiento de las redes feedforward es relativamente
+intuitivo, el mayor desafío está en la correcta derivación e implementación del
+paso de actualización de pesos. La forma usual de esta actualización es mediante
+el descenso por el gradiente, en particular mediante el algoritmo de
+backpropagation. Es bueno tener en cuenta que hay muchas formas de minimizar una
+función como la de costo, por esto se implementó antes una versión que actualiza
+los pesos mediante algoritmos genéticos que, si bien es subóptima no logrando
+superar el 25% de precisión en el clasificador MNIST, muestra que incluso
+algoritmos tan sencillos logran hacer que la red aprenda ciertos patrones. La
 red desarrollada en este trabajo utilizará descenso por el gradiente pero con un
 algoritmo distinto a backpropagation que se deriva a continuación.
 
-Utilizaremos como función de costo el error cuadrático medio (MSE) de la capa de salida contra el objetivo esperado:
+<!--
+TODO: explicación del diagrama, agregar el código de colores a los casos -->
+
+Utilizaremos como función de costo el error cuadrático medio (MSE) de la capa de
+salida contra el objetivo esperado:
 
 $$
 E(\vec s, \vec t) = \frac 1 {\#L} \sum^{*L}_{q=0}{(O_q - t_q)^2}
@@ -71,20 +89,23 @@ Con
 - $*L$: índice de la última neurona de la capa $L$
 - $\# L$: tamaño de la capa $L$
 
-Expresamos el gradiente de la función de error con respecto a un peso específico.
+Expresamos el gradiente de la función de error con respecto a un peso
+específico.
 
 $$
 \tag{1}
 \nabla E^k_{ij}
 := \frac {\partial E(\vec s, \vec t)} {\partial w^k_{ij}}
-= \frac 2 {\# L} \sum_{q=0}^{*L} (O_q - t_q) \frac {\partial a^L_q} {\partial w^k_{ij}}
+= \frac 2 {\# L} \sum_{q=0}^{*L} (O_q - t_q)
+\frac {\partial a^L_q} {\partial w^k_{ij}}
 $$
 
 Con
 
 - $w^k_{ij}$: peso de neurona $i$ de capa $k$ a neurona $j$ de capa $k+1$
 - $O_q$: salida $q$ de la red
-- $a^L_q$: salida de la neurona $q$ de la capa $L$. Al ser la última capa es $O_q$.
+- $a^L_q$: salida de la neurona $q$ de la capa $L$. Al ser la última capa es
+  $O_q$.
 
 ---
 
@@ -148,7 +169,9 @@ a^l_q} {\partial w^k_{ij}}$.
 
     $$h^l_q = \sum_{r=0}^{\# (l - 1)} a^{l-1}_r w^{l-1}_{rq}$$
 
-    Dividimos en dos subcasos para determinar la derivada parcial $\frac {\partial h^l_q} {\partial w^k_{ij}}$, cuando el peso llega a la neurona $q$ y cuando no, lo que resulta en:
+    Dividimos en dos subcasos para determinar la derivada parcial $\frac
+    {\partial h^l_q} {\partial w^k_{ij}}$, cuando el peso llega a la neurona $q$
+    y cuando no, lo que resulta en:
 
     - Si $j = q \Rightarrow \frac {\partial a^l_q} {\partial w^k_{ij}} =
       g'(h^l_q) \cdot a^k_i$
@@ -185,8 +208,8 @@ $$
 ## Implementación
 
 Al implementar tanto la fórmula anterior en este algoritmo de frontpropagation
-como el resto de los aspectos de la red surgen distintas particularidades que se detallan a
-continuación.
+como el resto de los aspectos de la red surgen distintas particularidades que se
+detallan a continuación.
 
 La derivación anterior de $\frac {\partial a^l_q} {\partial w^k_{ij}}$ puede
 verse reflejada en la implementación en los métodos con nombre conteniendo la
@@ -221,17 +244,18 @@ cantidad de entradas y salidas que el tamaño del minibatch.
 
 <!-- TODO: Linkear a algo que muestre lo de los batches -->
 
-Para lograr mejoras en los tiempos de ejecución se utilizan técnicas de *programación
-dinámica* para aliviar el trabajo extra que significa la recursividad en la
-actualización de pesos. También se utiliza *Cython*, un superconjunto de Python que
-transpila a C, para reescribir y paralelizar con OpenMP porciones del código que lo
-ameritan para mayor rendimiento. En el proceso se utilizan diversos profilers como
-`line_profile`, `cProfile` y `perf` para entender mejor los hotspots del código. Por
-cada cuello de botella detectado con un profiler se lo reescribe utilizando de forma
-extensiva el conocimiento de las ecuaciones y transformaciones de aritmética matricial
-que puedan ser de beneficio computacional. Si bien la versión más performante pierde
-legibilidad en contraste con la original, es escencial entender que no es más que una
-transformación aritmética.
+Para lograr mejoras en los tiempos de ejecución se utilizan técnicas de
+*programación dinámica* para aliviar el trabajo extra que significa la
+recursividad en la actualización de pesos. También se utiliza *Cython*, un
+superconjunto de Python que transpila a C, para reescribir y paralelizar con
+OpenMP porciones del código que lo ameritan para mayor rendimiento. En el
+proceso se utilizan diversos profilers como `line_profile`, `cProfile` y `perf`
+para entender mejor los hotspots del código. Por cada cuello de botella
+detectado con un profiler se lo reescribe utilizando de forma extensiva el
+conocimiento de las ecuaciones y transformaciones de aritmética matricial que
+puedan ser de beneficio computacional. Si bien la versión más performante pierde
+legibilidad en contraste con la original, es escencial entender que no es más
+que una transformación aritmética.
 
 Luego de estas mejoras, la implementación gana un rendimiento sustancial que,
 pese a no estar completamente optimizado, es suficiente como para entrenar en
@@ -255,7 +279,7 @@ de frontpropagation presentado en este trabajo).
 \emph{Tabla: tiempos de entrenamiento de una época en segundos sobre distintas CPUs}
 \end{center}
 
-<!-- TODO: Checkear si ese tag center anda en el pdf de pandoc -->
+<!-- TODO: Checkear si la descripcion de la tabla se ve bien -->
 
 ## Desempeño de la Red
 
@@ -263,7 +287,8 @@ Se utiliza la implementación para modelar dos redes sobre el conjunto de dígit
 manuscritos [MNIST]. Un clasificador con arquitectura `28² x 16 x 16 x 10` que
 reconoce el dígito escrito y un autoencoder `28² x 64 x 28²` que imita la
 función identidad de la entrada. Se implementan también las mismas redes en
-PyTorch. Los siguientes resultados son sobre el conjunto de validación, los resultados sobre el conjunto de entrenamiento son virtualmente identicos.
+PyTorch. Los siguientes resultados son sobre el conjunto de validación, los
+resultados sobre el conjunto de entrenamiento son virtualmente identicos.
 
 ![Clasificador MNIST - Error y Precisión](res/class_losses_hitrate_es.svg)
 
@@ -272,8 +297,8 @@ versión en `PyTorch` utilizan la [misma][kaiming-pytorch-docs] inicialización 
 pesos basada en [Kaiming][kaiming-paper] sobre una distribución uniforme, los
 bias en la versión `PyTorch` son inicializados de forma levemente distinta. A
 esto y al azar inherente a la corrida se le atribuyen las pequeñas diferencias
-de performance de las redes. Para mostrar este punto se grafica además una versión
-`Nnet*` que utiliza una forma de inicialización más ingenua (i.e. $\frac
+de performance de las redes. Para mostrar este punto se grafica además una
+versión `Nnet*` que utiliza una forma de inicialización más ingenua (i.e. $\frac
 {\mathcal{N}(0, 1)} {\sqrt{fanin}}$) que en estas arquitecturas parece mejorar
 el rendimiento.
 
@@ -286,24 +311,28 @@ el rendimiento.
 Notar la similitud de las versiones `Nnet` y `PyTorch`. Esto muestra que nuestro
 algoritmo de frontpropagation parece estar dando los mismos resultados que el
 backpropagation clásico. Efectivamente si se inicializan las dos redes con los
-mismos pesos los resultados no presentan diferencia significativa, incluso con las
-aleatoriedades propias del descenso estocástico.
+mismos pesos los resultados no presentan diferencia significativa, incluso con
+las aleatoriedades propias del descenso estocástico.
 
 ## Conclusiones
 
 Se ha implementado una red neuronal desde los conceptos básicos derivando e
-implementando en el proceso un algoritmo de actualización de pesos que es correcto. Se
-ha mostrado que a pesar de ser poco eficiente, logra entrenar redes de tamaños significativos en tiempos aceptables. El conocimiento obtenido en el proceso es de gran valor y permite obtener una mayor solvencia en la implementación de nuevas técnicas sobre las redes.
+implementando en el proceso un algoritmo de actualización de pesos que es
+correcto. Se ha mostrado que a pesar de ser poco eficiente, logra entrenar redes
+de tamaños significativos en tiempos aceptables. El conocimiento obtenido en el
+proceso es de gran valor y permite obtener una mayor solvencia en la
+implementación de nuevas técnicas sobre las redes.
 
-A futuro es posible implementar otras características como regularizaciones, dropout,
-actualización ADAM, función de error cross entropy las cuales será posible poner a punto
-para la aplicación deseada modificando no solo los parámetros pero, de ser necesario,
-los algoritmos en sí. Esto trae mucha libertad de exploración para plantear nuevas
-técnicas. Otra tecnología que no se alcanzó a profundizar, es el uso de
-autodiferenciación. Notar que cambios en la función de error necesitarían volver a
-derivar e implementar los gradientes, librerías como PyTorch o TensorFlow utilizan en
-cambio autodiferenciación sobrecargando operadores para, regla de la cadena mediante,
-calcular los gradientes de forma automática para cualquier combinación de operaciones.
+A futuro es posible implementar otras características como regularizaciones,
+dropout, actualización ADAM, función de error cross entropy las cuales será
+posible poner a punto para la aplicación deseada modificando no solo los
+parámetros pero, de ser necesario, los algoritmos en sí. Esto trae mucha
+libertad de exploración para plantear nuevas técnicas. Otra tecnología que no se
+alcanzó a profundizar, es el uso de autodiferenciación. Notar que cambios en la
+función de error necesitarían volver a derivar e implementar los gradientes,
+librerías como PyTorch o TensorFlow utilizan en cambio autodiferenciación
+sobrecargando operadores para, regla de la cadena mediante, calcular los
+gradientes de forma automática para cualquier combinación de operaciones.
 
 <!-- Referencias -->
 
