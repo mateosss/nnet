@@ -1,11 +1,8 @@
 """NeuralNetwork unit tests"""
 
 from dataclasses import dataclass
-from os import truncate
-from sys import dont_write_bytecode
 
 import numpy as np
-from numpy.lib.function_base import gradient
 from numpy.linalg import norm
 
 import mnist
@@ -147,7 +144,7 @@ def test_get_gradients():
     dlayers = [784, 16, 16, 10]
     nnet = NeuralNetwork(dlayers, batch_size=BATCH_SIZE)
 
-    old_out = nnet.feedforward(INPUT)[0]
+    nnet.feedforward(INPUT)
     old_error = nnet.get_error(TARGET)[0]
     py_grads = nnet.py_get_gradients(TARGET)
     np_grads = nnet.np_get_gradients(TARGET)

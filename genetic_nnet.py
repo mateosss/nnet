@@ -1,3 +1,4 @@
+from time import time
 from typing import List
 from random import sample
 from numpy import mean
@@ -6,9 +7,12 @@ import mnist
 from nnet import NeuralNetwork
 from genetics import Subject, GeneticAlgorithm
 
+BATCH_SIZE = 10
+
 class GANeuralNetwork(Subject, NeuralNetwork):
 
-    # __mnist_db = list(mnist.read()) TODO: Uncomment and make this work again
+    __mnist_db = mnist.load(batch_size=BATCH_SIZE)
+    __batch_gen = (batch for epoch in __mnist_db for batch in epoch)
 
     _genome: List[float]
     _fitness: float
@@ -18,7 +22,7 @@ class GANeuralNetwork(Subject, NeuralNetwork):
         Precondition: use set_layers_description() before any instanciation
         so dlayers is initialized
         """
-        super().__init__(GANeuralNetwork.dlayers, params)
+        super().__init__(GANeuralNetwork.dlayers, BATCH_SIZE, params=params)
         self._genome = params
         self._fitness = None
 
@@ -32,27 +36,30 @@ class GANeuralNetwork(Subject, NeuralNetwork):
 
     @property
     def fitness(self) -> float:
-        return self.batch_cost() if not self._fitness else self._fitness
-
-    def batch_cost(self, batch_size=10, random_samples=False):
-        "Runs a random minibatch and returns average network cost"
-        costs = [None] * batch_size
-        db = (
-            sample(GANeuralNetwork.__mnist_db, batch_size) if random_samples
-            else GANeuralNetwork.__mnist_db[:batch_size]
-        )
-        for i, (label, image) in enumerate(db): # TODO: parallelize runs
-            # Run network
-            ninput = [pixel / 255 for row in image for pixel in row] # Normalized
-            self.weights = self.weights_from_params(self.genome)
-            guess = self.feedforward(ninput)
-            # Cost calculation
-            expected = [1 if i == label else 0 for i in range(10)]
-            costs[i] = sum((g - e)**2 for g, e in zip(guess, expected))
-        cost = mean(costs)
-        self._fitness = -cost
-        # print(f"Average cost of {cost} after {batch_size} runs")
+        if not self._fitness:
+            self._fitness = -self.batch_cost()
         return self._fitness
+
+    def batch_cost(self):
+        random_batch = next(GANeuralNetwork.__batch_gen)
+        error = self.batch_eval(random_batch, grads=False)
+        return error
+
+    def test(self):
+        itime = time()
+        train_cumloss = train_cumhits = 0
+        epoch = next(mnist.load(batch_size=self.batch_size))
+        nof_batches = int(60000 / BATCH_SIZE)
+        for batch in epoch:
+            cumloss, cumhits = self.batch_eval(batch, grads=False, hitrate=True)
+            train_cumloss += cumloss
+            train_cumhits += cumhits
+        train_avgloss = train_cumloss / nof_batches
+        train_hitrate = train_cumhits / nof_batches
+        test_time = time() - itime
+        print(
+            f"[E] {train_avgloss=:.6f} {train_hitrate=:.2f}% {test_time=:.2f}s"
+        )
 
     # TODO: Think more about this and make it
     # Maybe a urand in [c +- d] range with c = (min + max) / 2, d = max - min
@@ -63,14 +70,14 @@ class GANeuralNetwork(Subject, NeuralNetwork):
     @classmethod
     def set_layers_description(cls, dlayers):
         """
-        Override of NeuralNetwork method that makes it static
+        Override of NeuralNetwork method to make it static.
         dlayers will be used as a static attribute of GANeuralNetwork class
         """
         cls.dlayers = dlayers
 
     @classmethod
     def get_random_params(cls):
-        return super().get_random_params(cls)
+        return super().get_random_params_custom(cls)
 
 
 class NeuralGA(GeneticAlgorithm):

@@ -31,18 +31,17 @@ gprime = lambda h: g(h) * (1 - g(h))  # g'(in^l_q)
 
 
 class NeuralNetwork:
-    # Note: under current layer k: read comments as if n, m = dlayers[k], dlayers[k + 1]
+    # NOTE: read comments as if n, m = dlayers[k], dlayers[k + 1]
     dlayers: List[int]  # Layer description
     batch_size: int  # Amount of samples to process together
     weights: List  # List of (n + 1, m) arrays (+1 for bias). The synaptic efficacy
     activations: List  # List of (batch_size, n + 1) arrays. The value of a neuron
-
-    gradients: List  # List of (batch_size, n + 1, m). Error gradients for each weight
     fanins: List  # List of (batch_size, n) arrays. The linear input for a neuron
 
     _dadw_cache: Dict
     _DADW_cache: Dict
-    _velocities: List # Previous velocities for SGD momentum
+    _gradients: List  # List of (batch_size, n + 1, m). Storage for error gradients for each weight
+    _velocities: List  # Previous velocities for SGD momentum
 
     def __init__(self, dlayers: List[int], batch_size: int, params: List[int] = None):
         """
@@ -62,11 +61,7 @@ class NeuralNetwork:
         params = params if params is not None else self.get_random_params()
         self.weights = self.weights_from_params(params)
 
-        # TODO: Right now self.gradients could be removed as it is not really in use
-        # however it may be useful to repurpose it to be the only malloc made in
-        # the entire run of the network for improved performance
-        # do this when sure that the mallocs are a real bottleneck
-        self.gradients = [
+        self._gradients = [
             zeros((batch_size, n + 1, m)) for n, m in zip(dlayers, dlayers[1:])
         ]
 
@@ -150,10 +145,10 @@ class NeuralNetwork:
             return self._dadw_cache[args]
 
         # Range assertions
-        assert l >= 0 and l < len(self.dlayers), f"out of range {l=}"
-        assert k >= 0 and k < len(self.dlayers), f"out of range {k=}"
-        assert i >= 0 and i < self.activations[k].size, f"out of range {i=}"
-        assert j >= 0 and j < self.dlayers[k], f"out of range {j=}"
+        assert 0 <= l < len(self.dlayers), f"out of range {l=}"
+        assert 0 <= k < len(self.dlayers), f"out of range {k=}"
+        assert 0 <= i < self.activations[k].size, f"out of range {i=}"
+        assert 0 <= j < self.dlayers[k], f"out of range {j=}"
 
         # Usage assertions
         # while dadw is theoretically defined as 0 for these, we don't want them to run
@@ -188,22 +183,21 @@ class NeuralNetwork:
         self._dadw_cache[args] = res
         return res
 
-    def py_get_gradients(self, target, b=0) -> List[Array]:
+    def py_get_gradients(self, target) -> List[Array]:
         """Matrix of each error gradient ∇E^k_{i, j} using dadw() for batch sample b."""
         L = len(self.dlayers) - 1  # Last layer index
         mseconst = 2 / self.dlayers[-1]
-        gradients = [zeros_like(g) for g in self.gradients]
         for k in reversed(range(L)):
             for b in range(self.batch_size):
                 n, m = self.dlayers[k], self.dlayers[k + 1]
                 for j in range(m):
                     for i in range(n + 1):  # +1 for bias neuron
-                        gradients[k][b, i, j] = mseconst * sum(
+                        self._gradients[k][b, i, j] = mseconst * sum(
                             (self.activations[L][b, q] - target[b, q])
                             * self.py_dadw(L, q, k, i, j, b=b)
                             for q in range(self.dlayers[-1])
                         )
-        return gradients
+        return self._gradients
 
     def cy_DADW(self, l, q, k):
         return dadw.DADW(self, l, q, k)
@@ -220,7 +214,7 @@ class NeuralNetwork:
         if args in self._DADW_cache:
             return self._DADW_cache[args]
 
-        res = zeros_like(self.gradients[k])  # (batch_size, n + 1, m)
+        res = zeros_like(self._gradients[k])  # (batch_size, n + 1, m)
         if l == k + 1:
             derivatives = gprime(self.fanins[l][:, q, AXIS])
             columns = self.activations[k][:]
@@ -240,23 +234,17 @@ class NeuralNetwork:
     def np_get_gradients(self, target: Array) -> List[Array]:
         """Matrix of each error gradient ∇E^k_{i, j} using DADW() matrices."""
 
-        # Prefill cache, improves performance, unnecessary for correctness
-        cache = self.cy_DADW_prepopulate()
-        for q in range(16):
-            self._DADW_cache[(2, q, 0)] = cache[q]
-
         L = len(self.dlayers) - 1  # Last layer index
         mseconst = 2 / self.dlayers[L]
-        gradients: List = [None for _ in self.weights]
         for k in reversed(range(L)):
-            summation = zeros_like(self.gradients[k])  # (batch_size, n + 1, m)
+            summation = zeros_like(self._gradients[k])  # (batch_size, n + 1, m)
             for q in range(self.dlayers[L]):
                 tgtdiff = self.activations[L][:, q] - target[:, q]
                 tgtdiff = tgtdiff[:, AXIS, AXIS]
                 ALqk = self.np_DADW(L, q, k)
                 summation += tgtdiff * ALqk
-            gradients[k] = mseconst * summation
-        return gradients
+            self._gradients[k] = mseconst * summation
+        return self._gradients
 
     def update_weights(self, gradients, lr=10, momentum=0.5):
         """Update weights using stochastic gradient decent with momentum.

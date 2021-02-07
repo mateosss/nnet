@@ -31,7 +31,7 @@ class GeneticAlgorithm:
 
     def __init__(
         self, SubjectClass, iterations,
-        size=8, mutation_rate=(1 / 1000), crossover_rate=0.7
+        size=8, mutation_rate=(5 / 1000), crossover_rate=0.7
     ):
         assert size % 2 == 0
         self.SubjectClass = SubjectClass
@@ -43,7 +43,8 @@ class GeneticAlgorithm:
     def run(self, iterations):
         popsize = len(self.population)
         for i in range(iterations):
-            self.dump_round_stats(i, iterations)
+            if i % 100 == 0: self.dump_round_stats(i, iterations)
+            if i % 5000 == 4999: self.population[0].test()
             self.roulette_sort()
             self.population += self.best_half_offspring()
             self.population += self.best_half_offspring()

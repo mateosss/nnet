@@ -1,0 +1,72 @@
+# Custom mateosss matplotlib style
+# Modified from Pitaya at https://github.com/dhaitz/matplotlib-stylesheets
+
+# darkgray = "#263238"
+# COLORS = [ # Regular cycle
+#     "#2196F3",  # blue
+#     "#4CAF50",  # green
+#     "#FFC107",  # amber
+#     "#E91E63",  # pink
+#     "#673AB7",  # deeppurple
+#     "#00BCD4",  # cyan
+#     "#CDDC39",  # lime
+#     "#FF5722",  # deeporange
+#     "#009688",  # teal
+# ]
+#
+# DARK_COLORS = [
+#     "#1976D2",  # dark blue
+#     "#388E3C",  # dark green
+#     "#FFA000",  # dark amber
+#     "#C2185B",  # dark pink
+#     "#512DA8",  # dark deeppurple
+#     "#0097A7",  # dark cyan
+#     "#AFB42B",  # dark lime
+#     "#E64A19",  # dark deeporange
+#     "#00796B",  # dark teal
+# ]
+
+
+text.color: 263238
+axes.labelcolor: 263238
+xtick.color: 263238
+ytick.color: 263238
+
+axes.spines.top: False
+axes.spines.right: False
+axes.spines.bottom: True
+axes.spines.left: True
+axes.grid: True
+grid.linestyle: -
+grid.linewidth: 0.125
+grid.color: 263238
+
+axes.prop_cycle: cycler('color', ['2196F3','E91E63','FFC107','4CAF50','673AB7','00BCD4','CDDC39','FF5722','009688'])
+# font.family: CMU Serif Extra
+font.family: Fira Code
+
+# legend.frameon: False
+# legend.numpoints: 1
+# legend.scatterpoints: 1
+# xtick.direction: out
+# ytick.direction: out
+# xtick.color: .15
+# ytick.color: .15
+# axes.axisbelow: True
+# grid.linestyle: -
+# lines.solid_capstyle: round
+
+# # Seaborn darkgrid parameters
+# axes.grid: True
+# axes.facecolor: EAEAF2
+# axes.edgecolor: white
+# axes.linewidth: 0
+# grid.color: white
+# xtick.major.size: 0
+# ytick.major.size: 0
+# xtick.minor.size: 0
+# ytick.minor.size: 0
+# font.sans-serif: Overpass, Helvetica, Helvetica Neue, Arial, Liberation Sans, DejaVu Sans, Bitstream Vera Sans, sans-serif
+# image.cmap: RdPu
+# figure.facecolor: ff0000
+# savefig.facecolor: ff0000

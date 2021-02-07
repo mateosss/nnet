@@ -33,7 +33,7 @@ def load_params():
 
 
 def genetic_main():
-    ga = NeuralGA(DLAYERS, 10)
+    ga = NeuralGA(DLAYERS, 100000)
     save_params(ga.best)
     return ga.best
 
