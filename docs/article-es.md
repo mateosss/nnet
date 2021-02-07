@@ -18,6 +18,10 @@ header-includes:
       urlcolor=cyan
       urlstyle{same}}
 
+  # For figures being linked to its top
+  - \usepackage{hyperref}
+  - \usepackage[all]{hypcap}
+
   # For wrapping text around figures
   - \usepackage{wrapfig}
 
@@ -82,15 +86,16 @@ trabajo utilizará descenso por el gradiente pero con un algoritmo distinto a
 backpropagation que se deriva a continuación.
 
  <!-- HTML BEGIN  -->
-<!-- <center><img src="res/network-diagram.svg" width="65%"/></center>
-*<center>Figura 1: Diagrama y notación de la red. Los colores serán referenciados a continuación.</center>* -->
+<!-- <center><img id="network-diagram" src="res/network-diagram.svg" width="65%"/></center>
+*<center>Figura 1: Diagrama y notación de la red. Los colores serán utiles al derivar por casos.</center>* -->
  <!-- HTML END  -->
 
 <!-- LATEX BEGIN -->
 \begin{figure}[h]
   \centering
-  \includegraphics[width=0.65\textwidth]{res/network-diagram.pdf}
-  \caption{\emph{Diagrama y notación de la red. Los colores serán referenciados a continuación.}}
+  \includegraphics[width=1.0\textwidth]{res/network-diagram.pdf}
+  \caption{\emph{Diagrama y notación de la red. Los colores serán utiles al derivar por casos.}}
+  \label{network-diagram}
 \end{figure}
 <!-- LATEX END -->
 
@@ -104,10 +109,11 @@ $$
 E(\vec s, \vec t) = \frac 1 {\#L} \sum^{*L}_{q=0}{(O_q - t_q)^2}
 $$
 
-En donde
+<!-- En donde -->
 
 <!-- HTML BEGIN -->
-<!-- - $\vec s$: entrada
+<!--**Notación**
+- $\vec s$: entrada
 - $\vec t$: objetivo
 - $O_q$: salida $q$ de la red
 - $L$: índice de última capa
@@ -116,16 +122,17 @@ En donde
 <!-- HTML END -->
 
 <!-- LATEX BEGIN -->
-\begin{multicols}{3}
-\begin{itemize}
-\item $\vec s$: entrada
-\item $\vec t$: objetivo
-\item $O_q$: salida $q$ de la red
-\item $L$: índice de última capa
-\item $*L$: índice de la última neurona de la capa $L$
-\item $\# L$: tamaño de la capa $L$
-\end{itemize}
-\end{multicols}
+\begin{flushleft}
+\bigskip
+\textbf{Notación}
+$\bullet$ $\vec s$: entrada
+$\bullet$ $\vec t$: objetivo
+$\bullet$ $O_q$: salida $q$ de la red
+$\bullet$ $L$: índice de última capa\\
+\hspace*{4.55em} $\bullet$ $*L$: índice de la última neurona de la capa $L$
+$\bullet$ $\# L$: tamaño de la capa $L$
+\bigskip
+\end{flushleft}
 <!-- END BEGIN -->
 
 Expresamos el gradiente de la función de error con respecto a un peso
@@ -139,22 +146,24 @@ $$
 \frac {\partial a^L_q} {\partial w^k_{ij}}
 $$
 
-Con
 
 <!-- HTML BEGIN -->
-<!-- - $w^k_{ij}$: peso de neurona $i$ de capa $k$ a neurona $j$ de capa $k+1$
+<!-- **Notación**
+- $w^k_{ij}$: peso de neurona $i$ de capa $k$ a neurona $j$ de capa $k+1$
 - $a^L_q$: salida de la neurona $q$ de la capa $L$. Al ser la última capa es
   $O_q$. -->
 <!-- HTML END -->
 
 <!-- LATEX BEGIN -->
-\begin{multicols}{2}
-\begin{itemize}
-\item $w^k_{ij}$: peso de neurona $i$ de capa $k$ a neurona $j$ de capa $k+1$
-\item $a^L_q$: salida de la neurona $q$ de la capa $L$. Al ser la última capa es
+\begin{flushleft}
+\bigskip
+\textbf{Notación}
+$\bullet$ $w^k_{ij}$: peso de neurona $i$ de capa $k$ a neurona $j$ de capa $k+1$\\
+\hspace*{4.55em} $\bullet$ $a^L_q$: salida de la neurona $q$ de la capa $L$. Al ser la última capa es
   $O_q$.
-\end{itemize}
-\end{multicols}
+\bigskip
+\end{flushleft}
+
 <!-- LATEX END -->
 
 > **Nota:** Es en este punto en dónde se ha divergido de la derivación estándar
@@ -188,48 +197,54 @@ Con
 Continuando desde $(1)$ es posible ver que se necesitará analizar $\frac
 {\partial a^l_q} {\partial w^k_{ij}}$ con $l = 0, \ldots, L$, es decir cómo
 afecta el peso $w^k_{ij}$ a la neurona $a^l_q$, para poder calcular $\frac
-{\partial a^L_q} {\partial w^k_{ij}}$. Con
+{\partial a^L_q} {\partial w^k_{ij}}$.
 
-- $g$: función de activación utilizada en todas las capas.
+<!-- HTML BEGIN -->
+<!--**Notación**
+- $g$: función de activación utilizada en todas las capas. -->
+<!-- HTML END -->
+
+<!-- LATEX BEGIN -->
+\begin{flushleft}
+\bigskip
+\textbf{Notación}
+$\bullet$ $g$: función de activación utilizada en todas las capas.
+\bigskip
+\end{flushleft}
+<!-- LATEX END -->
 
 Estamos ahora en posición de analizar por casos el valor de $\frac {\partial
-a^l_q} {\partial w^k_{ij}}$.
+a^l_q} {\partial w^k_{ij}}$. Notar que cada uno de estos casos se encuentra
+ilustrado en el $\hyperref[network-diagram]{diagrama}$ anterior.
 
-- Si $l = 0$ (capa de entrada) $\Rightarrow \frac {\partial a^0_q} {\partial
+1. Si $l = 0$ (capa de entrada) $\Rightarrow \frac {\partial a^0_q} {\partial
   w^k_{ij}} = 0$
+  ya que $a^0_q$ es una constante de entrada.
 
-  ya que $a^0_q \equiv 0$
-
-- Sino, si $q = \#l$ (neurona de bias) $\Rightarrow \frac {\partial a^l_q}
+2. Sino, si $q = \#l$ (neurona de bias) $\Rightarrow \frac {\partial a^l_q}
   {\partial w^k_{ij}} = 0$
-
   ya que la neurona bias es constantemente 1.
 
-- Sino, si $k \ge l$ (peso posterior a neurona) $\Rightarrow \frac {\partial
+3. Sino, si $k \ge l$ (peso posterior a neurona) $\Rightarrow \frac {\partial
   a^l_q} {\partial w^k_{ij}} = 0$
+  ya que tal peso no influye en la activación.
 
-  ya que un peso posterior no influye en el valor de activación.
-
-- Sino, si $k = l - 1$ (peso inmediato a la neurona) $\Rightarrow \frac
+4. Sino, si $k = l - 1$ (peso inmediato a la neurona) $\Rightarrow \frac
   {\partial a^l_q} {\partial w^k_{ij}} = g'(h^l_q) \frac {\partial h^l_q}
-  {\partial w^k_{ij}}$
+  {\partial w^k_{ij}}$.
 
-    En este caso como
+    Teniendo en cuenta que $h^l_q = \sum_{r=0}^{\# (l - 1)} a^{l-1}_r
+    w^{l-1}_{rq}$, dividimos en dos subcasos, cuando el peso llega a la
+    neurona $q$ y cuando no, para determinar la derivada parcial
+    $\frac {\partial h^l_q} {\partial w^k_{ij}}$ lo que resulta en:
 
-    $$h^l_q = \sum_{r=0}^{\# (l - 1)} a^{l-1}_r w^{l-1}_{rq}$$
-
-    Dividimos en dos subcasos para determinar la derivada parcial $\frac
-    {\partial h^l_q} {\partial w^k_{ij}}$, cuando el peso llega a la neurona $q$
-    y cuando no, lo que resulta en:
-
-    - Si $j = q \Rightarrow \frac {\partial a^l_q} {\partial w^k_{ij}} =
+    1. Si $j = q \Rightarrow \frac {\partial a^l_q} {\partial w^k_{ij}} =
       g'(h^l_q) \cdot a^k_i$
 
-    - Si $j \ne q \Rightarrow \frac {\partial a^l_q} {\partial w^k_{ij}} =
+    2. Si $j \ne q \Rightarrow \frac {\partial a^l_q} {\partial w^k_{ij}} =
       g'(h^l_q) \cdot 0 = 0$
 
-- Sino, si $k < l - 1$ (peso no inmediato a la neurona)
-
+5. Sino, si $k < l - 1$ (peso no inmediato a la neurona)
   $\Rightarrow \frac
   {\partial a^l_q} {\partial w^k_{ij}} = g'(h^l_q) \cdot
   \sum^{*(l-1)}_{r=0}{w^{l-1}_{rq} \frac {\partial a^{l-1}_r} {\partial
