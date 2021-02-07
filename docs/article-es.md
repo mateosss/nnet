@@ -7,6 +7,8 @@
 output: pdf_document
 geometry: "left=3cm,right=3cm,top=3cm,bottom=3cm"
 header-includes:
+
+  # Color of links
   - \hypersetup{
       colorlinks=true,
       linkcolor=cyan,
@@ -15,14 +17,31 @@ header-includes:
       filecolor=magenta
       urlcolor=cyan
       urlstyle{same}}
+
+  # For wrapping text around figures
   - \usepackage{wrapfig}
+
+  # Multicolumn definitions
+  - \usepackage{multicol}
+
+  # Blockquotes background color
+  - \usepackage{framed}
+  - \usepackage{xcolor}
+  - \let\oldquote=\quote
+  - \let\endoldquote=\endquote
+  - \definecolor{shadecolor}{HTML}{ECEFF1}
+  - \renewenvironment{quote}{\begin{shaded*}\begin{oldquote}}{\end{oldquote}\end{shaded*}}
+
+  # Caption prefixes in spanish
   - \renewcommand{\figurename}{Figura}
   - \renewcommand{\tablename}{Tabla}
 ---
 
+<!-- TODO: Tiene el color correcto los links? -->
 <!-- TODO: Estoy manteniendo bien los tiempos verbales a lo largo del texto? -->
 <!-- TODO: Spellcheck -->
 <!-- TODO: 80 column wrap -->
+<!-- Ver que los nombres de figura y tablas matcheen en el pdf y el html -->
 
 # Implementación Red Feedforward
 
@@ -50,26 +69,30 @@ sobre los datos de [MNIST] en tiempos razonables.
 
 <!-- TODO: Referenciar nnet.svgz como una derivación handwritten más detallada -->
 
-<!-- ![Diagrama y notación de la red](res/network-diagram.svg) -->
-
-\begin{wrapfigure}{r}{0.5\textwidth}
-  \begin{center}
-    \includegraphics[width=0.48\textwidth]{res/network-diagram.pdf}
-  \end{center}
-  \caption{Diagrama y notación de la red}
-\end{wrapfigure}
-
 Gran parte del funcionamiento de las redes feedforward es relativamente
 intuitivo, el mayor desafío está en la correcta derivación e implementación del
 paso de actualización de pesos. La forma usual de esta actualización es mediante
 el descenso por el gradiente, en particular mediante el algoritmo de
-backpropagation. Es bueno tener en cuenta que hay muchas formas de minimizar una
-función como la de costo, por esto se implementó antes una versión que actualiza
-los pesos mediante algoritmos genéticos que, si bien es subóptima no logrando
-superar el 25% de precisión en el clasificador MNIST, muestra que incluso
-algoritmos tan sencillos logran hacer que la red aprenda ciertos patrones. La
-red desarrollada en este trabajo utilizará descenso por el gradiente pero con un
-algoritmo distinto a backpropagation que se deriva a continuación.
+backpropagation. Vale aclarar que hay muchas formas de minimizar una función
+como la de costo, se implementó una versión que actualiza los pesos mediante
+algoritmos genéticos que, si bien es subóptima no logrando superar el 25% de
+precisión en el clasificador MNIST, muestra que incluso algoritmos tan sencillos
+logran hacer que la red aprenda ciertos patrones. El modelo desarrollado en este
+trabajo utilizará descenso por el gradiente pero con un algoritmo distinto a
+backpropagation que se deriva a continuación.
+
+ <!-- HTML BEGIN  -->
+<!-- <center><img src="res/network-diagram.svg" width="65%"/></center>
+*<center>Figura 1: Diagrama y notación de la red. Los colores serán referenciados a continuación.</center>* -->
+ <!-- HTML END  -->
+
+<!-- LATEX BEGIN -->
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.65\textwidth]{res/network-diagram.pdf}
+  \caption{\emph{Diagrama y notación de la red. Los colores serán referenciados a continuación.}}
+\end{figure}
+<!-- LATEX END -->
 
 <!--
 TODO: explicación del diagrama, agregar el código de colores a los casos -->
@@ -81,13 +104,29 @@ $$
 E(\vec s, \vec t) = \frac 1 {\#L} \sum^{*L}_{q=0}{(O_q - t_q)^2}
 $$
 
-Con
+En donde
 
-- $\vec s$: entrada
+<!-- HTML BEGIN -->
+<!-- - $\vec s$: entrada
 - $\vec t$: objetivo
+- $O_q$: salida $q$ de la red
 - $L$: índice de última capa
 - $*L$: índice de la última neurona de la capa $L$
-- $\# L$: tamaño de la capa $L$
+- $\# L$: tamaño de la capa $L$ -->
+<!-- HTML END -->
+
+<!-- LATEX BEGIN -->
+\begin{multicols}{3}
+\begin{itemize}
+\item $\vec s$: entrada
+\item $\vec t$: objetivo
+\item $O_q$: salida $q$ de la red
+\item $L$: índice de última capa
+\item $*L$: índice de la última neurona de la capa $L$
+\item $\# L$: tamaño de la capa $L$
+\end{itemize}
+\end{multicols}
+<!-- END BEGIN -->
 
 Expresamos el gradiente de la función de error con respecto a un peso
 específico.
@@ -102,39 +141,49 @@ $$
 
 Con
 
-- $w^k_{ij}$: peso de neurona $i$ de capa $k$ a neurona $j$ de capa $k+1$
-- $O_q$: salida $q$ de la red
+<!-- HTML BEGIN -->
+<!-- - $w^k_{ij}$: peso de neurona $i$ de capa $k$ a neurona $j$ de capa $k+1$
 - $a^L_q$: salida de la neurona $q$ de la capa $L$. Al ser la última capa es
+  $O_q$. -->
+<!-- HTML END -->
+
+<!-- LATEX BEGIN -->
+\begin{multicols}{2}
+\begin{itemize}
+\item $w^k_{ij}$: peso de neurona $i$ de capa $k$ a neurona $j$ de capa $k+1$
+\item $a^L_q$: salida de la neurona $q$ de la capa $L$. Al ser la última capa es
   $O_q$.
+\end{itemize}
+\end{multicols}
+<!-- LATEX END -->
 
----
-
-Es en este punto en dónde se ha divergido de la derivación estándar
-que llevaría a la implementación del algoritmo de backpropagation. La diferencia
-reside en plantear $\nabla E^k_{ij}$ de la siguiente manera
-$$
-\nabla E^k_{ij} = \frac {\partial E(\vec s, \vec t)} {\partial w^k_{ij}} = \frac
-1 {\# L} \sum_{q=0}^{*L} \delta^k_j \frac {\partial h^k_{j}} {\partial w^k_{ij}}
-$$
-
-En donde
-
-- $h^k_j$: la entrada de la neurona $j$ de la capa $k$ que es una suma pesada
-  (también llamada el fanin de la neurona).
-- $\delta^k_j := \frac {(O_q - t_q)^2} {\partial h^k_{j}}$: el llamado término
-  de error.
-
-Siguiendo la derivación desde este punto se llega a plantear los
-gradientes de la capa $k$ en función de los términos de error de la
-capa posterior $\delta^{k+1}_j$ y es de esta forma que barriendo desde la
-salida hacia la entrada propagando los términos de error es posible calcular
-todos los gradientes, de aquí el nombre *backpropagation*. Veremos que, por el
-contrario, la derivación presentada aquí dependerá de capas previas y por lo
-tanto hará un barrido desde la capa de entrada a la de salida. Llamaremos
-coloquialmente a su implementación *frontpropagation* (no confundir con el
-*forward pass* de la red).
-
----
+> **Nota:** Es en este punto en dónde se ha divergido de la derivación estándar
+> que llevaría a la implementación del algoritmo de backpropagation. La diferencia
+> reside en plantear $\nabla E^k_{ij}$ de la siguiente manera
+> $$
+> \nabla E^k_{ij} = \frac {\partial E(\vec s, \vec t)} {\partial w^k_{ij}} = \frac
+> 1 {\# L} \sum_{q=0}^{*L} \delta^k_j \frac {\partial h^k_{j}} {\partial w^k_{ij}}
+> $$
+>
+> En donde
+>
+> - $h^k_j$: la entrada de la neurona $j$ de la capa $k$ que es una suma pesada
+>   (también llamada el fanin de la neurona).
+>
+> - $\delta^k_j := \frac {(O_q - t_q)^2} {\partial h^k_{j}}$: el llamado término
+>   de error.
+>
+> Siguiendo la derivación desde este punto se llega a plantear los
+> gradientes de la capa $k$ en función de los términos de error de la
+> capa posterior $\delta^{k+1}_j$ y es de esta forma que barriendo desde la
+> salida hacia la entrada propagando los términos de error es posible calcular
+> todos los gradientes, de aquí el nombre *backpropagation*. Veremos que, por el
+> contrario, la derivación presentada aquí dependerá de capas previas y por lo
+> tanto hará un barrido desde la capa de entrada a la de salida. Llamaremos
+> coloquialmente a su implementación *frontpropagation* (no confundir con el
+> *forward pass* de la red).
+>
+> ​ <!-- This line has a hidden whitespace character for padding -->
 
 Continuando desde $(1)$ es posible ver que se necesitará analizar $\frac
 {\partial a^l_q} {\partial w^k_{ij}}$ con $l = 0, \ldots, L$, es decir cómo
@@ -274,10 +323,15 @@ de frontpropagation presentado en este trabajo).
 | `cy` | 3.97 | 4.23 | 1.71 | 0.63 |
 | `tr` | 0.08 | 0.10 | — | — |
 
-<!-- *<center>Tabla 1: Tiempos de entrenamiento por época en segundos</center>* -->
+<!-- HTML BEGIN -->
+<!-- *<center>Tiempos de entrenamiento por época en segundos</center>* -->
+<!-- HTML END -->
+
+<!-- LATEX BEGIN -->
 \begin{center}
-\emph{Tabla: tiempos de entrenamiento de una época en segundos sobre distintas CPUs}
+\emph{Tiempos de entrenamiento de una época en segundos sobre distintas CPUs}
 \end{center}
+<!-- LATEX END -->
 
 <!-- TODO: Checkear si la descripcion de la tabla se ve bien -->
 
@@ -302,11 +356,15 @@ versión `Nnet*` que utiliza una forma de inicialización más ingenua (i.e. $\f
 {\mathcal{N}(0, 1)} {\sqrt{fanin}}$) que en estas arquitecturas parece mejorar
 el rendimiento.
 
+<!-- HTML BEGIN -->
 <!-- ![Clasificador MNIST - Error y Precisión](res/auto_losses_es.svg) -->
+<!-- HTML END -->
 
+<!-- LATEX BEGIN -->
 \begin{center}
   \includegraphics[width=200px]{res/auto_losses_es.pdf}
 \end{center}
+<!-- LATEX END -->
 
 Notar la similitud de las versiones `Nnet` y `PyTorch`. Esto muestra que nuestro
 algoritmo de frontpropagation parece estar dando los mismos resultados que el
