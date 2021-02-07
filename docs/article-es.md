@@ -167,11 +167,12 @@ $k+1$\\
 <!-- LATEX END -->
 
 > **Nota:** Es en este punto en dónde se ha divergido de la derivación estándar
-> que llevaría a la implementación del algoritmo de backpropagation. La diferencia
-> reside en plantear $\nabla E^k_{ij}$ de la siguiente manera
+> que llevaría a la implementación del algoritmo de backpropagation. La
+> diferencia reside en plantear $\nabla E^k_{ij}$ de la siguiente manera
 > $$
-> \nabla E^k_{ij} = \frac {\partial E(\vec s, \vec t)} {\partial w^k_{ij}} = \frac
-> 1 {\# L} \sum_{q=0}^{*L} \delta^k_j \frac {\partial h^k_{j}} {\partial w^k_{ij}}
+> \nabla E^k_{ij} = \frac {\partial E(\vec s, \vec t)} {\partial w^k_{ij}} =
+> \frac 1 {\# L} \sum_{q=0}^{*L} \delta^k_j \frac {\partial h^k_{j}} {\partial
+> w^k_{ij}}
 > $$
 >
 > En donde
@@ -182,22 +183,22 @@ $k+1$\\
 > - $\delta^k_j := \frac {(O_q - t_q)^2} {\partial h^k_{j}}$: llamado usualmente
 >   término de error.
 >
-> Siguiendo la derivación con estos factores se llegan a plantear los
-> gradientes de la capa $k$ en función de los términos de error $\delta^{k+1}_j$
-> de la capa posterior y es de esta forma que barriendo desde la
-> salida hacia la entrada y propagando los términos de error es posible calcular
-> todos los gradientes, de aquí el nombre *backpropagation*. Veremos que, por el
-> contrario, la derivación presentada aquí dependerá de capas previas y por lo
-> tanto hará un barrido desde la capa de entrada a la de salida. Llamaremos
-> coloquialmente a su implementación *frontpropagation* (no confundir con el
-> *forward pass* de la red).
+> Siguiendo la derivación con estos factores se llegan a plantear los gradientes
+> de la capa $k$ en función de los términos de error $\delta^{k+1}_j$ de la capa
+> posterior y es de esta forma que barriendo desde la salida hacia la entrada y
+> propagando los términos de error es posible calcular todos los gradientes, de
+> aquí el nombre *backpropagation*. Veremos que, por el contrario, la derivación
+> presentada aquí dependerá de capas previas y por lo tanto hará un barrido
+> desde la capa de entrada a la de salida. Llamaremos coloquialmente a su
+> implementación *frontpropagation* (no confundir con el *forward pass* de la
+> red).
 >
 > ​ <!-- This line has a hidden whitespace character for padding -->
 
 Continuando desde $(1)$ es posible ver que se necesitará analizar $\frac
 {\partial a^l_q} {\partial w^k_{ij}}$ para $l = 0, \ldots, L$, *(i.e. cómo
-afecta el peso $w^k_{ij}$ a cada neurona $a^l_q$)* y así poder finalmente computar
-$\frac {\partial a^L_q} {\partial w^k_{ij}}$.
+afecta el peso $w^k_{ij}$ a cada neurona $a^l_q$)* y así poder finalmente
+computar $\frac {\partial a^L_q} {\partial w^k_{ij}}$.
 
 <!-- HTML BEGIN -->
 <!--**Notación**
@@ -353,29 +354,34 @@ ineficiente de frontpropagation presentado en este trabajo).
 Se utiliza la implementación para modelar dos redes sobre el conjunto de dígitos
 manuscritos [MNIST]. Un clasificador con arquitectura `28² x 16 x 16 x 10` que
 reconoce el dígito escrito y un autoencoder `28² x 64 x 28²` que imita la
-función identidad de la entrada. Se implementan también las mismas redes en
-PyTorch. Los siguientes resultados son sobre el conjunto de validación, los
-resultados sobre el conjunto de entrenamiento son virtualmente identicos.
+función identidad para el dominio de los datos. Se implementan también las
+mismas redes en PyTorch. Ambos modelos utilizan MSE y SGD con momentum 0.5 y
+learning rate 10, tamaño de minibatch 1000, función sigmoide como activación en
+todas las neuronas y sin ningún método de regularización. Los siguientes
+resultados son sobre el conjunto de validación, los resultados sobre el conjunto
+de entrenamiento son virtualmente identicos.
 
 ![Clasificador MNIST - Error y Precisión](res/class_losses_hitrate_es.svg)
 
-Cabe aclarar que si bien tanto la implementación de este trabajo `Nnet` como la
+Cabe aclarar que si bien tanto la implementación `Nnet` de este trabajo como la
 versión en `PyTorch` utilizan la [misma][kaiming-pytorch-docs] inicialización de
 pesos basada en [Kaiming][kaiming-paper] sobre una distribución uniforme, los
 bias en la versión `PyTorch` son inicializados de forma levemente distinta. A
 esto y al azar inherente a la corrida se le atribuyen las pequeñas diferencias
 de performance de las redes. Para mostrar este punto se grafica además una
-versión `Nnet*` que utiliza una forma de inicialización más ingenua (i.e. $\frac
-{\mathcal{N}(0, 1)} {\sqrt{fanin}}$) que en estas arquitecturas parece mejorar
-el rendimiento.
+versión `Nnet*` que utiliza una forma de [inicialización][custom-initialization]
+más ingenua (i.e. $\frac {\mathcal{N}(0, 1)} {\sqrt{fanin}}$) que en estas
+arquitecturas parece mejorar el rendimiento.
 
 <!-- HTML BEGIN -->
 <!-- ![Clasificador MNIST - Error y Precisión](res/auto_losses_es.svg) -->
 <!-- HTML END -->
 
+<!-- TODO: Quizás el gráfico del autoencoder estaría bueno que le texto wrapee -->
+
 <!-- LATEX BEGIN -->
 \begin{center}
-  \includegraphics[width=200px]{res/auto_losses_es.pdf}
+  \includegraphics[width=.5\textwidth]{res/auto_losses_es.pdf}
 \end{center}
 <!-- LATEX END -->
 
@@ -417,3 +423,4 @@ gradientes de forma automática para cualquier combinación de operaciones.
 [pynet-getgradients]: https://example.com <!-- TODO -->
 [matricization]: https://example.com <!-- TODO -->
 [cynet-getgradients]: https://example.com <!-- TODO -->
+[custom-initialization]: https://example.com <!-- TODO -->
