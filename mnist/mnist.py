@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 DTYPE = np.dtype("float32")
-MNIST_PATH = "./mnist_training_data"
+MNIST_PATH = "./mnist/mnist_training_data"
 
 
 def load(dataset="training", batch_size=10, path=MNIST_PATH):

@@ -3,7 +3,7 @@
 from time import time
 import numpy as np
 
-import mnist
+from mnist import mnist
 from nets.ganet import NeuralGA
 from nets.nnet import NeuralNetwork
 from nets.cynet import CyNet

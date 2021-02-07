@@ -11,7 +11,7 @@ from typing import List, Type
 import numpy as np
 from numpy.random import rand, randn
 
-import mnist
+from mnist import mnist
 from .nnet import NeuralNetwork
 
 BATCH_SIZE = 10
