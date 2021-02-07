@@ -4,8 +4,9 @@ from time import time
 import numpy as np
 
 import mnist
-from nets.genetic_nnet import NeuralGA
-from nets.nnet import NeuralNetwork, CyNet
+from nets.ganet import NeuralGA
+from nets.nnet import NeuralNetwork
+from nets.cynet import CyNet
 
 # TODO: Improve program print output
 # TODO: Add argparse options to configure the run
@@ -14,6 +15,8 @@ SAVE_FILE = "params.npy"
 DLAYERS = [784, 16, 16, 10]
 EPOCHS = 16
 BATCH_SIZE = 1000
+
+np.random.seed(1)
 
 # Assertion needed for using dataset()
 assert 60000 % BATCH_SIZE == 0 and 10000 % BATCH_SIZE == 0

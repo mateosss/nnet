@@ -4,7 +4,8 @@ disable =
 #   comparison-with-itself, # The comparisson operators semantics are peculiar
 #   unbalanced-tuple-unpacking # Expression.expr_mappings needs this
     invalid-name, # One letter names improve readability in short scopes
-    fixme, # TODOs in code are not immediate concerns
+    fixme, # To-do reminders in code are not immediate concerns
+    c-extension-no-member, # Using extension modules
     # TODO: The following are disabled but need to be addressed eventually
     missing-module-docstring,
     missing-class-docstring,
