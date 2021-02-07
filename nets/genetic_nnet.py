@@ -4,8 +4,8 @@ from random import sample
 from numpy import mean
 from numpy.random import randn
 import mnist
-from nnet import NeuralNetwork
-from genetics import Subject, GeneticAlgorithm
+from .nnet import NeuralNetwork
+from .genetics import Subject, GeneticAlgorithm
 
 BATCH_SIZE = 10
 

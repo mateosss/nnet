@@ -7,6 +7,6 @@ assert os.getenv("CC"), "A c compiler must be specified through the CC envvar"
 
 setup(
     name="DADW extension module",
-    ext_modules=cythonize("dadw.pyx", annotate=True),
+    ext_modules=cythonize("nets/dadw.pyx", annotate=True),
     zip_safe=False,
 )

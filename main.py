@@ -4,8 +4,8 @@ from time import time
 import numpy as np
 
 import mnist
-from genetic_nnet import NeuralGA
-from nnet import NeuralNetwork, CyNet
+from nets.genetic_nnet import NeuralGA
+from nets.nnet import NeuralNetwork, CyNet
 
 # TODO: Improve program print output
 # TODO: Add argparse options to configure the run
