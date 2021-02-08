@@ -5,7 +5,7 @@
 # linkcolor=[rgb]{0 1 1} works as well
 # date: November 29, 2020
 output: pdf_document
-geometry: "left=3cm,right=3cm,top=3cm,bottom=3cm"
+geometry: "left=3.5cm,right=3.5cm,top=3cm,bottom=3cm"
 header-includes:
 
   # Color of links
@@ -45,7 +45,8 @@ header-includes:
 <!-- TODO: Estoy manteniendo bien los tiempos verbales a lo largo del texto? -->
 <!-- TODO: Spellcheck -->
 <!-- TODO: 80 column wrap -->
-<!-- Ver que los nombres de figura y tablas matcheen en el pdf y el html -->
+<!-- TODO: Ver que los nombres de figura y tablas matcheen en el pdf y el html -->
+<!-- TODO: Intentar reducir el margen horizontal de la página para mejor legibilidad -->
 
 # Implementación Red Feedforward
 
@@ -68,8 +69,6 @@ mediante el uso de Cython y paralelismo en CPU. El resultado final, lejos de ser
 sobre los datos de [MNIST] en tiempos razonables.
 
 ## Derivación
-
-<!-- TODO: Agregar gráfico de la red para visualizar neurona bias y indices k, q, i, j -->
 
 <!-- TODO: Referenciar nnet.svgz como una derivación handwritten más detallada -->
 
@@ -98,8 +97,8 @@ backpropagation que se deriva a continuación.
 \end{figure}
 <!-- LATEX END -->
 
-<!--
-TODO: explicación del diagrama, agregar el código de colores a los casos -->
+*Una versión más detallada del desarrollo que sigue puede encontrarse en
+las [notas manuscritas][handwritten-notes].*
 
 Utilizaremos como función de costo el error cuadrático medio (MSE) de la capa de
 salida contra el objetivo esperado:
@@ -177,8 +176,8 @@ $k+1$\\
 >
 > En donde
 >
-> - $h^k_j$: la entrada de la neurona $j$ de la capa $k$ que es una suma pesada
->   (también llamada el fanin de la neurona).
+> - $h^k_j$: entrada lineal de la neurona $j$ de la capa $k$ (antes de aplicar
+>   $g$)
 >
 > - $\delta^k_j := \frac {(O_q - t_q)^2} {\partial h^k_{j}}$: llamado usualmente
 >   término de error.
@@ -282,28 +281,16 @@ es ahora posible calcular, aunque de forma ineficiente, los gradientes y
 actualizar los pesos con ellos. Se realizaron *chequeos numéricos* para poner a
 prueba la correctitud de la implementación del cálculo del gradiente.
 
-<!-- TODO: Link tests -->
-<!-- TODO: Link stanford cs231n -->
-
 Se replantea el problema en función de *matrices* para aprovecharse de las
 mejoras de rendimiento proporcionadas por `NumPy` *(ver clase [`NpNet`])*. La
 explicación de las distintas transformaciones que se realizan escapan al alcance
 de este trabajo pero pueden verse en detalle en las notas manuscritas, en la
 sección de *"[matricization]"*.
 
-<!--
-TODO: Referenciar handwritten notes on matricization
-TODO: Linkear a los métodos np_DADW, np_get_gradients, etc
-TODO: Hablar más de las matrices DADW? y las otras matrices?
-TODO: una vez que haga los TODO de arriba, revisar y reescribir el párrafo
--->
-
 Además, como esperamos utilizar minibatches, prepararemos a la red para *correr
 de a batches*. En lugar de tomar una única entrada y devolver una única capa de
 salida, vectorizaremos la corrida para que la red reciba y devuelva la misma
 cantidad de entradas y salidas que el tamaño del minibatch.
-
-<!-- TODO: Linkear a algo que muestre lo de los batches -->
 
 Para lograr mejoras en los tiempos de ejecución se utilizan técnicas de
 *programación dinámica* para aliviar el trabajo extra que significa la
@@ -393,23 +380,24 @@ las aleatoriedades propias del descenso estocástico.
 
 ## Conclusiones
 
-Se ha implementado una red neuronal desde los conceptos básicos derivando e
-implementando en el proceso un algoritmo de actualización de pesos que es
-correcto. Se ha mostrado que a pesar de ser poco eficiente, logra entrenar redes
-de tamaños significativos en tiempos aceptables. El conocimiento obtenido en el
-proceso es de gran valor y permite obtener una mayor solvencia en la
-implementación de nuevas técnicas sobre las redes.
+Quedan aún varias características a implementar que mejorarían el rendimiento y
+desempeño de este trabajo. Dropout, backpropagation, actualización ADAM, función
+de error cross entropy, offloading a GPUs, entre otras son algunas de las
+posibles mejoras a abordar. Teniendo el conocimiento de la red completo se
+facilita mucho su puesta a punto para aplicaciones específicas de estos
+algoritmos así como también la exploración de técnicas novedosas. En particular,
+procedimientos de autodiferenciación como los usados por PyTorch o TensorFlow
+serían de gran utilidad ya que sobrecargando operadores permiten calcular,
+mediante la regla de la cadena, los gradientes sobre cualquier composición de
+operaciones y permitirían mayor flexibilidad a la hora de elegir las funciones
+utilizadas por la red.
 
-A futuro es posible implementar otras características como regularizaciones,
-dropout, actualización ADAM, función de error cross entropy las cuales será
-posible poner a punto para la aplicación deseada modificando no solo los
-parámetros pero, de ser necesario, los algoritmos en sí. Esto trae mucha
-libertad de exploración para plantear nuevas técnicas. Otra tecnología que no se
-alcanzó a profundizar, es el uso de autodiferenciación. Notar que cambios en la
-función de error necesitarían volver a derivar e implementar los gradientes,
-librerías como PyTorch o TensorFlow utilizan en cambio autodiferenciación
-sobrecargando operadores para, regla de la cadena mediante, calcular los
-gradientes de forma automática para cualquier combinación de operaciones.
+Se ha implementado una red neuronal desde los conceptos básicos derivando en el
+proceso un algoritmo de actualización de pesos que es correcto. Se ha mostrado
+que a pesar de ser poco eficiente, logra entrenar redes de tamaños
+significativos en tiempos aceptables. El conocimiento obtenido en el proceso es
+de gran valor y permite obtener una mayor solvencia en la implementación de
+nuevas técnicas sobre las redes.
 
 <!-- Referencias -->
 
@@ -422,5 +410,6 @@ gradientes de forma automática para cualquier combinación de operaciones.
 [`CyNet`]: https://example.com <!-- TODO -->
 [pynet-getgradients]: https://example.com <!-- TODO -->
 [matricization]: https://example.com <!-- TODO -->
+[handwritten-notes]: https://example.com <!-- TODO -->
 [cynet-getgradients]: https://example.com <!-- TODO -->
 [custom-initialization]: https://example.com <!-- TODO -->
