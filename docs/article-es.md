@@ -40,6 +40,10 @@ header-includes:
   - \renewcommand{\figurename}{Figura}
   - \renewcommand{\tablename}{Tabla}
 ---
+<!-- HTML BEGIN -->
+<!-- Haga click [aquí](https://mateosss.github.io/nnet/article-es.pdf)
+para leer el artículo en pdf. -->
+<!-- HTML END -->
 
 # Implementación Red Feedforward
 
@@ -76,12 +80,14 @@ trabajo utilizará descenso por el gradiente pero con un algoritmo distinto a
 backpropagation que se deriva a continuación.
 
 <!-- HTML BEGIN  -->
-<!-- <center>
-  <img id="network-diagram" src="res/network-diagram.svg" width="65%"/>
-</center>
-*<center>
-  Figura 1: Diagrama y notación de la red. Los colores serán útiles al derivar por casos.
-</center>* -->
+<!-- <img
+  id="network-diagram" src="res/network-diagram.svg"
+  alt="Diagrama y notación de la red."
+/>
+<center><i>
+Figura 1: Diagrama y notación de la red. Los colores serán útiles al derivar por casos.
+</i></center>
+<br/> -->
 <!-- HTML END  -->
 <!-- LATEX BEGIN -->
 \begin{figure}[h]
@@ -127,7 +133,7 @@ $\bullet$ $L$: índice de última capa\\
 $\bullet$ $\# L$: tamaño de la capa $L$
 \bigskip
 \end{flushleft}
-<!-- END BEGIN -->
+<!-- LATEX END -->
 
 Expresamos el gradiente de la función de error con respecto a un peso
 específico.
@@ -145,7 +151,9 @@ $$
 <!-- **Notación**
 - $w^k_{ij}$: peso de neurona $i$ de capa $k$ a neurona $j$ de capa $k+1$
 - $a^L_q$: salida de la neurona $q$ de la capa $L$. Al ser la última capa *es*
-  $O_q$. -->
+  $O_q$.
+
+<br/> -->
 <!-- HTML END -->
 
 <!-- LATEX BEGIN -->
@@ -158,9 +166,12 @@ $k+1$\\
   ser la última capa \emph{es} $O_q$.
 \bigskip
 \end{flushleft}
-
 <!-- LATEX END -->
 
+<!-- HTML BEGIN -->
+<!-- > <br/>
+> -->
+<!-- HTML END -->
 > **Nota:** Es en este punto en dónde se ha divergido de la derivación estándar
 > que llevaría a la implementación del algoritmo de backpropagation. La
 > diferencia reside en plantear $\nabla E^k_{ij}$ de la siguiente manera
@@ -211,7 +222,12 @@ $\bullet$ $g$: función de activación utilizada en todas las capas.
 
 Estamos ahora en posición de analizar por casos el valor de $\frac {\partial
 a^l_q} {\partial w^k_{ij}}$. Notar que cada uno de estos casos se encuentra
+<!-- HTML BEGIN -->
+<!-- ilustrado en el [diagrama](#network-diagram) anterior. -->
+<!-- HTML END -->
+<!-- LATEX BEGIN -->
 ilustrado en el $\hyperref[network-diagram]{diagrama}$ anterior.
+<!-- LATEX END -->
 
 - Si $l = 0$ (capa de entrada) $\Rightarrow \frac {\partial a^l_q} {\partial
   w^k_{ij}} = 0$
@@ -321,7 +337,9 @@ ineficiente de frontpropagation presentado en este trabajo).
 | `tr` | 0.08 | 0.10 | — | — |
 
 <!-- HTML BEGIN -->
-<!-- *<center>Tiempos de entrenamiento por época en segundos</center>* -->
+<!-- <center><i>
+Tiempos de entrenamiento de una época en segundos sobre distintas CPUs
+</i></center> -->
 <!-- HTML END -->
 
 <!-- LATEX BEGIN -->
@@ -355,7 +373,11 @@ más ingenua (i.e. $\frac {\mathcal{N}(0, 1)} {\sqrt{fanin}}$) que en estas
 arquitecturas parece mejorar el rendimiento.
 
 <!-- HTML BEGIN -->
-<!-- ![Clasificador MNIST - Error y Precisión](res/auto_losses_es.svg) -->
+<!--
+<center><img
+  width="50%" src="res/auto_losses_es.svg"
+  alt="Clasificador MNIST - Error y Precisión"/>
+</center> -->
 <!-- HTML END -->
 
 <!-- LATEX BEGIN -->
