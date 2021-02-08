@@ -41,13 +41,6 @@ header-includes:
   - \renewcommand{\tablename}{Tabla}
 ---
 
-<!-- TODO: Tiene el color correcto los links? -->
-<!-- TODO: Estoy manteniendo bien los tiempos verbales a lo largo del texto? -->
-<!-- TODO: Spellcheck -->
-<!-- TODO: 80 column wrap -->
-<!-- TODO: Ver que los nombres de figura y tablas matcheen en el pdf y el html -->
-<!-- TODO: Intentar reducir el margen horizontal de la página para mejor legibilidad -->
-
 # Implementación Red Feedforward
 
 *Por Mateo de Mayo - <mateodemayo@gmail.com>*
@@ -70,8 +63,6 @@ sobre los datos de [MNIST] en tiempos razonables.
 
 ## Derivación
 
-<!-- TODO: Referenciar nnet.svgz como una derivación handwritten más detallada -->
-
 Gran parte del funcionamiento de las redes feedforward es relativamente
 intuitivo, el mayor desafío está en la correcta derivación e implementación del
 paso de actualización de pesos. La forma usual de esta actualización es mediante
@@ -84,15 +75,20 @@ logran hacer que la red aprenda ciertos patrones. El modelo desarrollado en este
 trabajo utilizará descenso por el gradiente pero con un algoritmo distinto a
 backpropagation que se deriva a continuación.
 
- <!-- HTML BEGIN  -->
-<!-- <center><img id="network-diagram" src="res/network-diagram.svg" width="65%"/></center>
-*<center>Figura 1: Diagrama y notación de la red. Los colores serán utiles al derivar por casos.</center>* -->
- <!-- HTML END  -->
+<!-- HTML BEGIN  -->
+<!-- <center>
+  <img id="network-diagram" src="res/network-diagram.svg" width="65%"/>
+</center>
+*<center>
+  Figura 1: Diagrama y notación de la red. Los colores serán útiles al derivar por casos.
+</center>* -->
+<!-- HTML END  -->
 <!-- LATEX BEGIN -->
 \begin{figure}[h]
   \centering
   \includegraphics[width=1.0\textwidth]{res/network-diagram.pdf}
-  \caption{\emph{Diagrama y notación de la red. Los colores serán utiles al derivar por casos.}}
+  \caption{\emph{Diagrama y notación de la red. Los colores serán útiles al
+    derivar por casos.}}
   \label{network-diagram}
 \end{figure}
 <!-- LATEX END -->
@@ -303,7 +299,7 @@ detectado con un profiler se lo reescribe utilizando de forma extensiva el
 conocimiento de las ecuaciones y transformaciones de aritmética matricial que
 puedan ser de beneficio computacional. Si bien la versión [más
 performante][cynet-getgradients] pierde legibilidad en contraste con la
-[original][pynet-getgradients], es escencial entender que no es más que una
+[original][pynet-getgradients], es esencial entender que no es más que una
 transformación aritmética.
 
 Luego de estas mejoras, la implementación gana un rendimiento sustancial que,
@@ -334,8 +330,6 @@ ineficiente de frontpropagation presentado en este trabajo).
 \end{center}
 <!-- LATEX END -->
 
-<!-- TODO: Checkear si la descripcion de la tabla se ve bien -->
-
 ## Desempeño de la Red
 
 Se utiliza la implementación para modelar dos redes sobre el conjunto de dígitos
@@ -346,7 +340,7 @@ mismas redes en PyTorch. Ambos modelos utilizan MSE y SGD con momentum 0.5 y
 learning rate 10, tamaño de minibatch 1000, función sigmoide como activación en
 todas las neuronas y sin ningún método de regularización. Los siguientes
 resultados son sobre el conjunto de validación, los resultados sobre el conjunto
-de entrenamiento son virtualmente identicos.
+de entrenamiento son virtualmente idénticos.
 
 ![Clasificador MNIST - Error y Precisión](res/class_losses_hitrate_es.svg)
 
@@ -363,8 +357,6 @@ arquitecturas parece mejorar el rendimiento.
 <!-- HTML BEGIN -->
 <!-- ![Clasificador MNIST - Error y Precisión](res/auto_losses_es.svg) -->
 <!-- HTML END -->
-
-<!-- TODO: Quizás el gráfico del autoencoder estaría bueno que le texto wrapee -->
 
 <!-- LATEX BEGIN -->
 \begin{center}
@@ -404,12 +396,12 @@ nuevas técnicas sobre las redes.
 [MNIST]: http://yann.lecun.com/exdb/mnist/
 [kaiming-pytorch-docs]: https://pytorch.org/docs/stable/nn.init.html#torch.nn.init.kaiming_uniform_
 [kaiming-paper]: https://arxiv.org/abs/1502.01852v1
-[`PyNet.dadw`]: https://example.com <!-- TODO -->
-[`PyNet`]: https://example.com <!-- TODO -->
-[`NpNet`]: https://example.com <!-- TODO -->
-[`CyNet`]: https://example.com <!-- TODO -->
-[pynet-getgradients]: https://example.com <!-- TODO -->
-[matricization]: https://example.com <!-- TODO -->
-[handwritten-notes]: https://example.com <!-- TODO -->
-[cynet-getgradients]: https://example.com <!-- TODO -->
-[custom-initialization]: https://example.com <!-- TODO -->
+[`PyNet.dadw`]: https://github.com/mateosss/nnet/blob/d6e1aae73915fa71bd4a9ce6f31a8192039c3c07/nets/pynet.py#L13
+[`PyNet`]: https://github.com/mateosss/nnet/tree/d6e1aae73915fa71bd4a9ce6f31a8192039c3c07/nets/pynet.py#L6
+[`NpNet`]: https://github.com/mateosss/nnet/tree/d6e1aae73915fa71bd4a9ce6f31a8192039c3c07/nets/npnet.py#L6
+[`CyNet`]: https://github.com/mateosss/nnet/tree/d6e1aae73915fa71bd4a9ce6f31a8192039c3c07/nets
+[pynet-getgradients]: https://github.com/mateosss/nnet/blob/d6e1aae73915fa71bd4a9ce6f31a8192039c3c07/nets/pynet.py#L59
+[matricization]: https://mateosss.github.io/nnet/notes.pdf#page=4
+[handwritten-notes]: https://mateosss.github.io/nnet/notes.pdf#page=2
+[cynet-getgradients]: https://github.com/mateosss/nnet/blob/d6e1aae73915fa71bd4a9ce6f31a8192039c3c07/nets/cynet_native.pyx#L113
+[custom-initialization]: https://github.com/mateosss/nnet/blob/d6e1aae73915fa71bd4a9ce6f31a8192039c3c07/nets/nnet.py#L72
