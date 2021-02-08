@@ -4,14 +4,15 @@ import struct
 import matplotlib.pyplot as plt
 import numpy as np
 
-DTYPE = np.dtype("float32") # TESTMARK
+DTYPE = np.dtype("float32")  # TESTMARK
 MNIST_PATH = "./mnist/mnist_training_data"
 
 
-def load(dataset="training", batch_size=10, path=MNIST_PATH):
+def load(dataset="training", batch_size=10, path=MNIST_PATH, autoencoder=False):
     """Import and process mnist dataset.
     Return generator of lists of batches
     with batch shape: (images: batch_size x 784, labels: batch_size x 10)
+    if autoencoder=True yields batches of (images, images)
     Based on https://gist.github.com/akesling/5358964
     """
 
@@ -21,7 +22,7 @@ def load(dataset="training", batch_size=10, path=MNIST_PATH):
     fname_lbl = os.path.join(path, f"{prefix}-labels-idx1-ubyte")
 
     with open(fname_lbl, "rb") as flbl:
-        _, num = struct.unpack(">II", flbl.read(8)) # _ is a magic number
+        _, num = struct.unpack(">II", flbl.read(8))  # _ is a magic number
         assert num % batch_size == 0
         lblt = np.fromfile(flbl, dtype=np.int8)
         lbl = np.zeros((num, 10), dtype=DTYPE)
@@ -38,8 +39,12 @@ def load(dataset="training", batch_size=10, path=MNIST_PATH):
 
     while True:
         batched_imgs = img.reshape(num // batch_size, batch_size, rows * cols)
-        batched_lbls = lbl.reshape((num // batch_size, batch_size, 10))
-        yield list(zip(batched_imgs, batched_lbls))
+        batched_tgts = (
+            lbl.reshape((num // batch_size, batch_size, 10))
+            if not autoencoder
+            else batched_imgs
+        )
+        yield list(zip(batched_imgs, batched_tgts))
         shuffle(img, lbl)
 
 
