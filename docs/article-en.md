@@ -1,6 +1,6 @@
 ---
-# title: "Modelo de Neurona Integrate and Fire"
-# subtitle: "Redes Neuronales 2020 - FaMAF, UNC - Octubre 2020"
+# title: "Integrate and Fire Neuron Model"
+# subtitle: "Neural Networks 2020 - FaMAF, UNC - October 2020"
 # author: Mateo de Mayo (mateodemayo@gmail.com)
 # linkcolor=[rgb]{0 1 1} works as well
 # date: November 29, 2020
@@ -36,56 +36,59 @@ header-includes:
   - \definecolor{shadecolor}{HTML}{ECEFF1}
   - \renewenvironment{quote}{\begin{shaded*}\begin{oldquote}}{\end{oldquote}\end{shaded*}}
 
-  # Caption prefixes in spanish
-  - \renewcommand{\figurename}{Figura}
-  - \renewcommand{\tablename}{Tabla}
+  # # Caption prefixes in spanish
+  - \renewcommand{\figurename}{Figure}
+  - \renewcommand{\tablename}{Table}
 ---
 <!-- HTML BEGIN -->
-<!-- Haga click [aquí](https://mateosss.github.io/nnet/article-es.pdf)
-para leer el artículo en pdf. -->
+<!-- Click [here](https://mateosss.github.io/nnet/article-es.pdf)
+to read this article in pdf. -->
 <!-- HTML END -->
 
-# Implementación Red Feedforward
+# Feedforward Network Implementation
 
-*Por Mateo de Mayo - <mateodemayo@gmail.com>*
+*By Mateo de Mayo - <mateodemayo@gmail.com>*
 
-Redes Neuronales 2020 - FaMAF, UNC - Febrero 2021
+Neural Networks 2020 - FaMAF, UNC - February 2021
 
-## Introducción
+## Introduction
 
-Se explora el proceso de derivación e implementación de una red neuronal
-feedforward multicapa y se analizan sus complicaciones para lograr un mejor
-entendimiento de los modelos actuales. Se deriva e implementa un algoritmo para
-el cálculo de los gradientes de forma ingenua y se lo contrasta con el estándar
-de backpropagation ofrecido por PyTorch. La implementación se realiza
-inicialmente en Python con la ayuda de la librería NumPy y tanto por el método
-ineficiente de actualización de gradientes como por el costo adicional del
-lenguaje interpretado surgen varios desafíos de performance que son abordados
-mediante el uso de Cython y paralelismo en CPU. El resultado final, lejos de ser
-óptimo, es adecuado para el entrenamiento de un clasificador y un autoencoder
-sobre los datos de [MNIST] en tiempos razonables.
+The process of deriving and implementing a multilayer feedforward neural network
+is explored and its difficulties are analyzed to get a better understanding of
+current models. A naive algorithm for the computation of gradients is derived
+and implemented and it is compared against more standard gradient descent
+techniques based on backpropagation as the ones offered by PyTorch. This
+procedure is initially implemented in python with the help of the NumPy library
+and, because of both the inefficient method of weight updates and the additional
+cost of the Python interpreter, many performance challenges arise. These
+problems are tackled through the use of both Cython and CPU parallelism. The
+final result, far from being optimal, is adequate enough for training a
+classifier and an autoencoder over the [MNIST] dataset in reasonable amounts of
+time.
 
 ## Derivación
 
-Gran parte del funcionamiento de las redes feedforward es relativamente
-intuitivo, el mayor desafío está en la correcta derivación e implementación del
-paso de actualización de pesos. La forma usual de esta actualización es mediante
-el descenso por el gradiente, en particular mediante el algoritmo de
-backpropagation. Vale aclarar que hay muchas formas de minimizar una función
-como la de costo. Se implementó una versión que actualiza los pesos mediante
-algoritmos genéticos que, si bien es subóptima no logrando superar el 25% de
-precisión en el clasificador MNIST, muestra que incluso algoritmos tan sencillos
-logran hacer que la red aprenda ciertos patrones. El modelo desarrollado en este
-trabajo utilizará descenso por el gradiente pero con un algoritmo distinto a
-backpropagation que se deriva a continuación.
+A big part of the workings of feedforward networks is relatively intuitive, the
+major challenge comes in the derivation and implementation of the weights update
+step. This update is usually done through gradient descent and, in particular,
+through the backpropagation algorithm. It is worth noting that there are many
+ways of minimizing a function like the cost function; in this study a version
+that updates the weights of the network through genetic algorithms was
+implemented and, while it is suboptimal not being able to even surpass the 25%
+mark of precision on the MNIST classifier, this method shows that even very
+simple algorithms are able to make the network learn certain patterns. The model
+further developed in this study uses gradient descent with an algorithm that is
+not backpropagation which is derived below.
+
 
 <!-- HTML BEGIN  -->
 <!-- <img
   id="network-diagram" src="res/network-diagram.svg"
-  alt="Diagrama y notación de la red."
+  alt="Network diagram and notation."
 />
 <center><i>
-Figura 1: Diagrama y notación de la red. Los colores serán útiles al derivar por casos.
+Figure 1: Network diagram and notation. Colors will be useful in the derivation
+by cases that follows.
 </i></center>
 <br/> -->
 <!-- HTML END  -->
@@ -93,48 +96,47 @@ Figura 1: Diagrama y notación de la red. Los colores serán útiles al derivar 
 \begin{figure}[h]
   \centering
   \includegraphics[width=1.0\textwidth]{res/network-diagram.pdf}
-  \caption{\emph{Diagrama y notación de la red. Los colores serán útiles al
-    derivar por casos.}}
+  \caption{\emph{Network diagram and notation. Colors will be useful in the
+    derivation by cases that follows.}}
   \label{network-diagram}
 \end{figure}
 <!-- LATEX END -->
 
-*Una versión más detallada del desarrollo que sigue puede encontrarse en
-las [notas manuscritas][handwritten-notes].*
+*A more detailed version of the formula development that follows can be found in
+the [handwritten notes][handwritten-notes].*
 
-Utilizaremos como función de costo el error cuadrático medio (MSE) de la capa de
-salida contra el objetivo esperado:
+The mean squared error (MSE) will be used as the cost function for the output
+layer against the expected target.
 
 $$
 E(\vec s, \vec t) = \frac 1 {\#L} \sum^{*L}_{q=0}{(O_q - t_q)^2}
 $$
 
 <!-- HTML BEGIN -->
-<!--**Notación**
-- $\vec s$: entrada
-- $\vec t$: objetivo
-- $O_q$: salida $q$ de la red
-- $L$: índice de última capa
-- $*L$: índice de la última neurona de la capa $L$
-- $\# L$: tamaño de la capa $L$ -->
+<!--**Notation**
+- $\vec s$: input
+- $\vec t$: target
+- $O_q$: network output $q$
+- $L$: last layer index
+- $*L$: index of the last neuron in layer $L$
+- $\# L$: layer $L$ size -->
 <!-- HTML END -->
 
 <!-- LATEX BEGIN -->
 \begin{flushleft}
 \bigskip
-\textbf{Notación}
-$\bullet$ $\vec s$: entrada
-$\bullet$ $\vec t$: objetivo
-$\bullet$ $O_q$: salida $q$ de la red
-$\bullet$ $L$: índice de última capa\\
-\hspace*{4.55em} $\bullet$ $*L$: índice de la última neurona de la capa $L$
-$\bullet$ $\# L$: tamaño de la capa $L$
+\textbf{Notation}
+$\bullet$ $\vec s$: input
+$\bullet$ $\vec t$: target
+$\bullet$ $O_q$: network output $q$
+$\bullet$ $L$: last layer index\\
+\hspace*{4.55em} $\bullet$ $*L$: index of the last neuron in layer $L$
+$\bullet$ $\# L$: layer $L$ size
 \bigskip
 \end{flushleft}
 <!-- LATEX END -->
 
-Expresamos el gradiente de la función de error con respecto a un peso
-específico.
+We express the loss function gradient with respect to a specific weight.
 
 $$
 \tag{1}
@@ -146,9 +148,9 @@ $$
 
 
 <!-- HTML BEGIN -->
-<!-- **Notación**
-- $w^k_{ij}$: peso de neurona $i$ de capa $k$ a neurona $j$ de capa $k+1$
-- $a^L_q$: salida de la neurona $q$ de la capa $L$. Al ser la última capa *es*
+<!-- **Notation**
+- $w^k_{ij}$: neuron $i$ weight from layer $k$ to neuron $j$ from layer $k+1$
+- $a^L_q$: neuron $q$ output from layer $L$. Being the last layer, it *is*
   $O_q$
 
 <br/> -->
@@ -157,11 +159,11 @@ $$
 <!-- LATEX BEGIN -->
 \begin{flushleft}
 \bigskip
-\textbf{Notación}
-$\bullet$ $w^k_{ij}$: peso de neurona $i$ de capa $k$ a neurona $j$ de capa
+\textbf{Notation}
+$\bullet$ $w^k_{ij}$: neuron $i$ weight from layer $k$ to neuron $j$ from layer
 $k+1$\\
-\hspace*{4.55em} $\bullet$ $a^L_q$: salida de la neurona $q$ de la capa $L$. Al
-  ser la última capa \emph{es} $O_q$.
+\hspace*{4.55em} $\bullet$ $a^L_q$: neuron $q$ output from layer $L$. Being the
+last layer, it \emph{is} $O_q$.
 \bigskip
 \end{flushleft}
 <!-- LATEX END -->
@@ -170,32 +172,31 @@ $k+1$\\
 <!-- > <br/>
 > -->
 <!-- HTML END -->
-> **Nota:** Es en este punto en dónde se ha divergido de la derivación estándar
-> que llevaría a la implementación del algoritmo de backpropagation. La
-> diferencia reside en plantear $\nabla E^k_{ij}$ de la siguiente manera
+> **Note:** It is at this point where the derivation has diverged from the
+> standard way of calculating the formulas that would lead to the implementation
+> of the backpropagation algorithm. The difference resides in expressing
+> $\nabla E^k_{ij}$ in the following way
 > $$
 > \nabla E^k_{ij} = \frac {\partial E(\vec s, \vec t)} {\partial w^k_{ij}} =
 > \frac 1 {\# L} \sum_{q=0}^{*L} \delta^k_j \frac {\partial h^k_{j}} {\partial
 > w^k_{ij}}
 > $$
 >
-> En donde
+> Where
 >
-> - $h^k_j$: entrada lineal de la neurona $j$ de la capa $k$ (antes de aplicar
->   $g$)
+> - $h^k_j$: linear input of neuron $j$ from layer $k$ (before applying $g$)
 >
-> - $\delta^k_j := \frac {(O_q - t_q)^2} {\partial h^k_{j}}$: llamado usualmente
->   término de error.
+> - $\delta^k_j := \frac {(O_q - t_q)^2} {\partial h^k_{j}}$: usually called
+>   the error term.
 >
-> Siguiendo la derivación con estos factores se llegan a plantear los gradientes
-> de la capa $k$ en función de los términos de error $\delta^{k+1}_j$ de la capa
-> posterior y es de esta forma que barriendo desde la salida hacia la entrada y
-> propagando los términos de error es posible calcular todos los gradientes, de
-> aquí el nombre *backpropagation*. Veremos que, por el contrario, la derivación
-> presentada aquí dependerá de capas previas y por lo tanto hará un barrido
-> desde la capa de entrada a la de salida. Llamaremos coloquialmente a su
-> implementación *frontpropagation* (no confundir con el *forward pass* de la
-> red).
+> Continuing the derivation with these factors, the layer $k$ gradients can be
+> stated as a function of the error terms $\delta^{k+1}_j$ from the posterior
+> layer and, in this way, sweeping from output to input and propagating the
+> error terms it is possible to calculate all gradients and thus the name
+> *backpropagation*. It will be seen that, conversely, the derivation presented
+> in this study will depend on previous layers and therefore it will sweep from
+> the input to the output layers. We will colloquially call its implementation
+> *frontpropagation* (not to be confused with the network *forward pass*).
 >
 > ​ <!-- This line has a hidden whitespace character for padding -->
 
