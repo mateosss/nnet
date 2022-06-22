@@ -1,5 +1,5 @@
 # Run requirements
-numpy==1.19.4
+numpy==1.22.0
 Cython==0.29.21
 
 # Dev requirements
